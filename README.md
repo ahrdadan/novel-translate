@@ -81,7 +81,17 @@ uv run uvicorn src.main:app --reload --port 8000
 
 The server will automatically initialize the SQLite database (`data/novel_trans.db`) and start the background job worker loop.
 
-### 3. API Documentation & System Specifications
+### 3. Docker Deployment
+
+To build and run the application using Docker:
+
+```bash
+docker build -t novel-trans-app .
+docker run -p 8000:8000 -v "$(pwd)/data:/app/data" novel-trans-app
+```
+*(The `-v` flag ensures your SQLite database persists across container restarts)*
+
+### 4. API Documentation & System Specifications
 
 - **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)

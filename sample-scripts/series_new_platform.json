@@ -11,7 +11,7 @@
   "translationModel": {
     "platform": {
       "name": "tokenrouter",
-      "apiKey": "sk-UTb31l18hcaiUNXxY3JZFo2rHTtE4R0VGuqqt5q5ApaBzslv",
+      "apiKey": "sk-",
       "apiType": "chat-completions",
       "models": [
         {

@@ -11,6 +11,7 @@ class SettingsResponse(BaseModel):
     default_translation_model_id: int | None = None
     default_extraction_model_id: int | None = None
     default_system_prompt_id: int | None = None
+    is_paused: bool = False
     updated_at: datetime | None = None
 
 
@@ -19,3 +20,4 @@ class SettingsUpdate(BaseModel):
     default_translation_model_id: int | None = None
     default_extraction_model_id: int | None = None
     default_system_prompt_id: int | None = None
+    is_paused: bool | None = None

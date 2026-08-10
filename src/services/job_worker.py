@@ -57,6 +57,16 @@ async def _worker_loop() -> None:
                 if recovered:
                     logger.warning("Auto-recovered %d stuck processing jobs to 'queued'", len(recovered))
 
+            if tick % 3600 == 0:
+                cleaned = await job_repo.cleanup_old_completed_jobs(days=7)
+                if cleaned > 0:
+                    logger.info("Auto-cleaned %d old completed jobs", cleaned)
+
+            settings = await settings_repo.get_settings()
+            if settings.get("is_paused"):
+                await asyncio.sleep(5)
+                continue
+
             if not semaphore.locked():
                 job = await job_repo.claim_next_queued()
                 if job:
@@ -276,7 +286,7 @@ async def execute_job(job: dict) -> None:
                 "chapter_number": chapter_number,
                 "chapter_title": chapter_title,
                 "stage": "extracting",
-                "message": f"🔍 Extracting new entities and glossary terms...",
+                "message": "🔍 Extracting new entities and glossary terms...",
             })
             sum_model = trans_model
             sum_platform = trans_platform
@@ -375,6 +385,15 @@ async def execute_job(job: dict) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.error("Job %d failed: %s", job_id, exc)
         await job_repo.update_job_status(job_id, "failed", error=str(exc))
+        
+        error_str = str(exc).lower()
+        if any(keyword in error_str for keyword in ["429", "401", "403", "insufficient_quota", "rate limit"]):
+            logger.critical("API Quota/Auth Error detected. Auto-pausing global queue.")
+            await settings_repo.update_settings({"is_paused": 1})
+            await ws_manager.broadcast({
+                "type": "system_paused",
+                "message": f"System Auto-Paused due to API Error on Job #{job_id}. Please check API Key and Resume.",
+            })
         try:
             ch = await chapter_repo.get_chapter(series_id, chapter_number)
             if ch:

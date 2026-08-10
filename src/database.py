@@ -43,6 +43,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
     settings_cols = [r["name"] for r in await cursor.fetchall()]
     if settings_cols and "default_system_prompt_id" not in settings_cols:
         await db.execute("ALTER TABLE settings ADD COLUMN default_system_prompt_id INTEGER REFERENCES system_prompts(id)")
+    if settings_cols and "is_paused" not in settings_cols:
+        await db.execute("ALTER TABLE settings ADD COLUMN is_paused INTEGER DEFAULT 0")
 
     # Check series columns
     cursor = await db.execute("PRAGMA table_info(series)")
@@ -55,6 +57,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
     jobs_cols = [r["name"] for r in await cursor.fetchall()]
     if jobs_cols and "system_prompt_ref" not in jobs_cols:
         await db.execute("ALTER TABLE jobs ADD COLUMN system_prompt_ref TEXT")
+    if jobs_cols and "strategy" not in jobs_cols:
+        await db.execute("ALTER TABLE jobs ADD COLUMN strategy TEXT DEFAULT 'pipeline'")
 
 
 
@@ -121,6 +125,7 @@ CREATE TABLE IF NOT EXISTS settings (
     default_translation_model_id INTEGER REFERENCES models(id),
     default_extraction_model_id INTEGER REFERENCES models(id),
     default_system_prompt_id INTEGER REFERENCES system_prompts(id) DEFAULT 1,
+    is_paused INTEGER DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -198,6 +203,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     translation_model_ref TEXT,
     extraction_model_ref TEXT,
     system_prompt_ref TEXT,
+    strategy TEXT DEFAULT 'pipeline',
     result TEXT,
     error TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

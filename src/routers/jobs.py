@@ -94,3 +94,18 @@ async def reset_stuck_jobs(timeout_minutes: int = 15):
         "reset_count": len(reset_jobs),
         "reset_jobs": [j["id"] for j in reset_jobs],
     }
+
+
+@router.delete("/cleanup")
+async def cleanup_jobs(status: str = "completed"):
+    """Manually delete jobs by status (e.g. 'completed' or 'completed,failed')."""
+    status_list = [s.strip().lower() for s in status.split(",") if s.strip()]
+    if not status_list:
+        raise HTTPException(400, "No valid status provided for cleanup")
+        
+    deleted_count = await job_repo.delete_jobs_by_status(status_list)
+    return {
+        "status": "ok",
+        "deleted_count": deleted_count,
+        "cleared_statuses": status_list
+    }

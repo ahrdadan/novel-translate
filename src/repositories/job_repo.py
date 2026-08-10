@@ -11,8 +11,8 @@ async def create_job(data: dict) -> dict:
     cursor = await db.execute(
         """INSERT INTO jobs
            (series_id, chapter_number, status, force_translate, force_summary,
-            extract, translation_model_ref, extraction_model_ref)
-           VALUES (?, ?, 'queued', ?, ?, ?, ?, ?)""",
+            extract, translation_model_ref, extraction_model_ref, strategy)
+           VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?)""",
         (
             data["series_id"],
             data["chapter_number"],
@@ -21,6 +21,7 @@ async def create_job(data: dict) -> dict:
             int(data.get("extract", True)),
             json.dumps(data.get("translation_model_ref")) if data.get("translation_model_ref") else None,
             json.dumps(data.get("extraction_model_ref")) if data.get("extraction_model_ref") else None,
+            data.get("strategy", "pipeline"),
         ),
     )
     await db.commit()
@@ -120,7 +121,6 @@ async def claim_next_queued() -> dict | None:
 
 async def reset_stuck_jobs(timeout_minutes: int = 15) -> list[dict]:
     """Find jobs stuck in 'processing' for longer than timeout_minutes and reset to 'queued'."""
-    db = await get_db()
     stuck_jobs = await get_jobs_by_status(["processing"])
     reset_jobs = []
     now = datetime.now(UTC)
@@ -138,7 +138,7 @@ async def reset_stuck_jobs(timeout_minutes: int = 15) -> list[dict]:
                     started_dt = started_dt.replace(tzinfo=UTC)
                 if (now - started_dt).total_seconds() > (timeout_minutes * 60):
                     is_stuck = True
-            except Exception:
+            except ValueError:
                 is_stuck = True
 
         if is_stuck:
@@ -240,3 +240,28 @@ async def list_jobs(
 
         jobs.append(job)
     return jobs
+
+
+async def cleanup_old_completed_jobs(days: int = 7) -> int:
+    """Delete jobs with status 'completed' older than X days."""
+    db = await get_db()
+    cursor = await db.execute(
+        "DELETE FROM jobs WHERE status = 'completed' AND completed_at < datetime('now', ?)",
+        (f"-{days} days",)
+    )
+    await db.commit()
+    return cursor.rowcount
+
+
+async def delete_jobs_by_status(statuses: list[str]) -> int:
+    """Manually delete jobs by a list of statuses (e.g. ['completed', 'failed'])."""
+    if not statuses:
+        return 0
+    db = await get_db()
+    placeholders = ", ".join(["?"] * len(statuses))
+    cursor = await db.execute(
+        f"DELETE FROM jobs WHERE status IN ({placeholders})",
+        statuses
+    )
+    await db.commit()
+    return cursor.rowcount

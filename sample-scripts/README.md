@@ -12,6 +12,7 @@ sample-scripts/
 ├── series.json                 # Config batch multi-chapter (Model ID Terdaftar)
 ├── series_new_platform.json    # Config batch multi-chapter (Platform & Model Baru Inline)
 ├── series_single_chapter.json  # Config 1 file HTML chapter
+├── generate-toc.py             # Script otomatis pembuat toc.json dari file HTML
 ├── README.md                   # Panduan dokumentasi
 └── novel-html/                 # Folder chapter HTML & TOC Metadata
     ├── toc.json                # Metadata daftar chapter, nomor, judul, dan filename HTML
@@ -21,6 +22,21 @@ sample-scripts/
     ├── response_chapter0009.html
     └── response_chapter0010.html
 ```
+
+---
+
+## 🛠️ Auto-Generate `toc.json` (`generate-toc.py`)
+
+Jika Anda memiliki banyak file HTML dan tidak ingin membuat `toc.json` secara manual, Anda bisa menggunakan script `generate-toc.py`. Script ini akan otomatis membaca urutan file HTML, mengambil judul dari tag `<h1>`, dan mengenerate file `toc.json` yang siap digunakan.
+
+**Cara Penggunaan:**
+```bash
+# Menjalankan dengan folder target novel-html dan mulai dari chapter 1
+python sample-scripts/generate-toc.py -d novel-html -s 1
+```
+
+- `-d` atau `--dir` : Menentukan nama atau path folder tempat file HTML berada (default: `novel-html`).
+- `-s` atau `--start` : Menentukan angka untuk mulai menghitung `chapterNumber` (default: 1).
 
 ---
 

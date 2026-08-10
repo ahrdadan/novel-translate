@@ -17,3 +17,4 @@ data/*
 # Environment files
 .env
 .env.*
+.ruff_cache/

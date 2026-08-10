@@ -7,7 +7,7 @@
     "sourceLanguage": "English",
     "targetLanguage": "Indonesian"
   },
-  "chaptersFolder": "novel-html2",
+  "chaptersFolder": "novel-html",
   "translationModel": {
     "platform": {
       "name": "tokenrouter",
