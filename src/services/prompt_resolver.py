@@ -5,34 +5,66 @@ from fastapi import HTTPException
 from src.repositories import series_repo, settings_repo, system_prompt_repo
 
 
-async def resolve_or_create_system_prompt(ref: dict) -> dict:
-    """Resolve a system prompt reference dict to a system prompt dict.
+async def resolve_or_create_system_prompt(ref: int | str | dict) -> dict:
+    """Resolve a system prompt reference to a system prompt dict.
 
     Accepts:
-      - {"system_prompt_id": 1}
-      - {"name": "custom-tone", "prompt_text": "..."}
-      - {"prompt_text": "..."}
+      - Direct Integer / String ID: 2 or "2" or {"system_prompt_id": 2} or {"id": 2}
+      - Existing Prompt Name: "formal" or {"name": "formal"}
+      - Create / Update Prompt: {"name": "wuxia_tone", "promptText": "..."}
+      - Custom Inline Text: {"prompt_text": "..."} or "You are a literary translator..."
     """
-    if "system_prompt_id" in ref and ref["system_prompt_id"] is not None:
-        prompt = await system_prompt_repo.get_prompt_by_id(ref["system_prompt_id"])
+    if isinstance(ref, (int, str)) and str(ref).isdigit():
+        prompt = await system_prompt_repo.get_prompt_by_id(int(ref))
         if not prompt:
-            raise HTTPException(404, f"System prompt ID {ref['system_prompt_id']} not found")
+            raise HTTPException(404, f"System prompt ID {ref} not found")
+        return prompt
+
+    if isinstance(ref, str):
+        # Check by name first
+        prompt = await system_prompt_repo.get_prompt_by_name(ref)
+        if prompt:
+            return prompt
+        # Treat long string as inline prompt text if not a name
+        if len(ref) > 30:
+            return {"id": 0, "name": "custom-inline", "prompt_text": ref, "is_default": 0}
+        raise HTTPException(404, f"System prompt with name '{ref}' not found")
+
+    if not isinstance(ref, dict):
+        raise HTTPException(400, "Invalid system prompt reference format")
+
+    prompt_id = ref.get("system_prompt_id") or ref.get("systemPromptId") or ref.get("id")
+    if prompt_id and isinstance(prompt_id, int):
+        prompt = await system_prompt_repo.get_prompt_by_id(prompt_id)
+        if not prompt:
+            raise HTTPException(404, f"System prompt ID {prompt_id} not found")
         return prompt
 
     name = ref.get("name")
-    prompt_text = ref.get("prompt_text")
+    prompt_text = ref.get("prompt_text") or ref.get("promptText")
+
+    if name and not prompt_text:
+        prompt = await system_prompt_repo.get_prompt_by_name(name)
+        if not prompt:
+            raise HTTPException(404, f"System prompt with name '{name}' not found")
+        return prompt
 
     if not prompt_text:
-        raise HTTPException(400, "System prompt reference must specify system_prompt_id or prompt_text")
+        raise HTTPException(
+            400, "System prompt reference must specify ID, Name, or promptText"
+        )
 
     if name:
         existing = await system_prompt_repo.get_prompt_by_name(name)
         if existing:
-            updated = await system_prompt_repo.update_prompt(existing["id"], {"prompt_text": prompt_text})
+            updated = await system_prompt_repo.update_prompt(
+                existing["id"], {"prompt_text": prompt_text}
+            )
             return updated or existing
         return await system_prompt_repo.create_prompt(name=name, prompt_text=prompt_text)
 
     return {"id": 0, "name": "custom-inline", "prompt_text": prompt_text, "is_default": 0}
+
 
 
 async def resolve_system_prompt_for_series(

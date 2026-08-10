@@ -398,7 +398,10 @@ This endpoint creates/resolves Series, Chapter (with automatic HTML cleaning), P
 | `translationModel.platform.model` | `Object` | *Optional* | `null` | **Single Model Object (1 Chapter 1 Model)**: `{"name": "gpt-4o", "url": "..."}`. |
 | `translationModel.platform.models` | `Array` | *Optional* | `null` | **Multiple Models Array**: `[{"name": "gpt-4o"}, {"name": "claude-3-5-sonnet"}]`. |
 | **`extractionModel`** | `Object` \| `Integer` | *Optional* | `null` | Extraction Model Reference (same structure as `translationModel`). |
-| **`systemPrompt`** | `Object` \| `Integer` | *Optional* | `null` | Custom System Prompt: `{"system_prompt_id": 2}` or `{"prompt_text": "..."}`. |
+| **`systemPrompt`** | `Object` \| `Integer` \| `String` | *Optional* | `null` | **System Prompt Reference**: Select existing prompt by ID `2`, by Name `"default"`, or create on-the-fly `{"name": "wuxia_tone", "promptText": "..."}`. |
+| `systemPrompt.id` | `Integer` | *Optional* | `null` | Existing System Prompt ID in database. |
+| `systemPrompt.name` | `String` | *Optional* | `null` | System Prompt name (e.g., `"default"`, `"formal"`, `"wuxia_tone"`). |
+| `systemPrompt.promptText` | `String` | *Optional* | `null` | Prompt text content. If `name` is new, creates a new prompt in DB; if `name` exists, updates prompt text. |
 | **`mode`** | `String` | *Optional* | `"sync"` | Execution mode: `"sync"` (blocking response) or `"async"` (job queue polling). |
 | **`forceTranslate`** | `Boolean` | *Optional* | `false` | Set `true` to force re-translating an already translated chapter. |
 | **`forceSummary`** | `Boolean` | *Optional* | `false` | Set `true` to force re-generating chapter plot summary. |
@@ -406,8 +409,8 @@ This endpoint creates/resolves Series, Chapter (with automatic HTML cleaning), P
 
 ---
 
-### 💡 6.2 Scenario 1: Existing Series + New Chapter + Existing Platform & Model
-Use existing Series by Name (no need to resend author/description) and existing Platform/Model:
+### 💡 6.2 Scenario 1: Existing Series + New Chapter + Existing Platform/Model + Existing System Prompt
+Use existing Series by Name (no need to resend author/description), existing Platform/Model, and existing System Prompt by Name (`"default"`):
 
 ```json
 {
@@ -427,6 +430,7 @@ Use existing Series by Name (no need to resend author/description) and existing 
       }
     }
   },
+  "systemPrompt": "default",
   "mode": "sync",
   "extract": true
 }
@@ -453,9 +457,26 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
                }
              }
            },
+           "systemPrompt": "default",
            "mode": "sync",
            "extract": true
          }'
+```
+
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "sync",
+  "series_id": 1,
+  "series_name": "Shadow Slave",
+  "chapter_number": 2,
+  "title": "Chapter 2: The First Nightmare",
+  "status": "translated",
+  "translated_text": "# Chapter 2: The First Nightmare\n\nSunny opened his eyes inside the ruined temple...",
+  "plot_summary": "Sunny awakens inside a ruined temple during his First Nightmare and evaluates his surroundings.",
+  "extracted_characters_count": 1,
+  "extracted_terms_count": 0
+}
 ```
 
 ---
@@ -486,6 +507,7 @@ Creates a new Series, parses/cleans raw HTML chapter text, registers new Platfor
       }
     }
   },
+  "systemPrompt": "default",
   "mode": "sync",
   "extract": true
 }
@@ -498,12 +520,13 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
      -d '{
            "series": {
              "name": "Lord of the Mysteries",
-             "author": "Cuttlefish That Loves Diving"
+             "author": "Cuttlefish That Loves Diving",
+             "description": "With the rising tide of steam and machinery..."
            },
            "chapter": {
              "chapterNumber": 1,
              "title": "Chapter 1: Crimson",
-             "sourceText": "<div><h1>Chapter 1</h1><p>Pain. Painful.</p></div>"
+             "sourceText": "<div><h1>Chapter 1</h1><p>Pain. Painful. Painful in the head.</p></div>"
            },
            "translationModel": {
              "platform": {
@@ -516,9 +539,26 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
                }
              }
            },
+           "systemPrompt": "default",
            "mode": "sync",
            "extract": true
          }'
+```
+
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "sync",
+  "series_id": 2,
+  "series_name": "Lord of the Mysteries",
+  "chapter_number": 1,
+  "title": "Chapter 1: Crimson",
+  "status": "translated",
+  "translated_text": "# Chapter 1: Crimson\n\nPain. Painful. Painful in the head...",
+  "plot_summary": "Zhou Mingrui awakens as Klein Moretti in Tingen City with severe head trauma.",
+  "extracted_characters_count": 1,
+  "extracted_terms_count": 1
+}
 ```
 
 ---
@@ -542,20 +582,38 @@ Registers a new model (`claude-3-5-sonnet`) under an existing platform (`aihubmi
       }
     }
   },
+  "systemPrompt": "default",
   "mode": "sync"
+}
+```
+
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "sync",
+  "series_id": 1,
+  "series_name": "Shadow Slave",
+  "chapter_number": 3,
+  "title": null,
+  "status": "translated",
+  "translated_text": "Chapter 3 text translated with Claude 3.5 Sonnet...",
+  "plot_summary": "Sunny navigates the mountain pass during the nightmare.",
+  "extracted_characters_count": 0,
+  "extracted_terms_count": 0
 }
 ```
 
 ---
 
-### 💡 6.5 Scenario 4: Re-Translate Existing Chapter using Text from Database & Direct Model ID
-Re-translates an existing chapter in database by integer IDs without re-sending chapter text or platform credentials:
+### 💡 6.5 Scenario 4: Async Job Queue & DB Text Re-translation
+Re-translates an existing chapter in database by integer IDs in `async` mode without re-sending chapter text:
 
 ```json
 {
   "series": 1,
   "chapter": 1,
   "translationModel": 2,
+  "systemPrompt": 1,
   "mode": "async",
   "forceTranslate": true
 }
@@ -569,11 +627,442 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
            "series": 1,
            "chapter": 1,
            "translationModel": 2,
+           "systemPrompt": 1,
            "mode": "async",
            "forceTranslate": true
          }'
 ```
 
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "async",
+  "job_id": 14,
+  "status": "queued",
+  "status_url": "/api/v1/jobs/14",
+  "series_id": 1,
+  "series_name": "Shadow Slave"
+}
+```
+
+---
+
+### 💡 6.6 Scenario 5: Selecting an Existing System Prompt by Name or ID
+Selects an existing System Prompt already stored in the database by its name (`"default"`, `"formal"`) or integer ID (`1`):
+
+```json
+{
+  "series": { "name": "Shadow Slave" },
+  "chapter": {
+    "chapterNumber": 4,
+    "title": "Chapter 4: The Hero",
+    "sourceText": "<p>Chapter 4 text...</p>"
+  },
+  "translationModel": {
+    "platform": {
+      "name": "aihubmix",
+      "model": { "name": "gpt-4o" }
+    }
+  },
+  "systemPrompt": "default",
+  "mode": "sync"
+}
+```
+
+#### cURL
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate-novel" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "series": { "name": "Shadow Slave" },
+           "chapter": {
+             "chapterNumber": 4,
+             "title": "Chapter 4: The Hero",
+             "sourceText": "<p>Chapter 4 text...</p>"
+           },
+           "translationModel": {
+             "platform": {
+               "name": "aihubmix",
+               "model": { "name": "gpt-4o" }
+             }
+           },
+           "systemPrompt": "default",
+           "mode": "sync"
+         }'
+```
+
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "sync",
+  "series_id": 1,
+  "series_name": "Shadow Slave",
+  "chapter_number": 4,
+  "title": "Chapter 4: The Hero",
+  "status": "translated",
+  "translated_text": "# Chapter 4: The Hero\n\nTranslated text using default prompt...",
+  "plot_summary": "Sunny meets Hero in the ruined city.",
+  "extracted_characters_count": 0,
+  "extracted_terms_count": 0
+}
+```
+
+---
+
+### 💡 6.7 Scenario 6: Adding & Registering a New System Prompt On-The-Fly
+Creates and registers a brand new System Prompt (`wuxia_tone`) in the SQLite `system_prompts` database table on-the-fly and immediately applies it to translate this chapter:
+
+```json
+{
+  "series": { "name": "Shadow Slave" },
+  "chapter": {
+    "chapterNumber": 5,
+    "title": "Chapter 5: Ascension",
+    "sourceText": "<p>Sunny sat in a lotus position, feeling the soul essence flow...</p>"
+  },
+  "translationModel": {
+    "platform": {
+      "name": "aihubmix",
+      "model": { "name": "gpt-4o" }
+    }
+  },
+  "systemPrompt": {
+    "name": "wuxia_tone",
+    "promptText": "You are a professional literary translator specializing in Wuxia and Xianxia web novels. Maintain poetic descriptions and honorific titles."
+  },
+  "mode": "sync"
+}
+```
+
+#### cURL
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate-novel" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "series": { "name": "Shadow Slave" },
+           "chapter": {
+             "chapterNumber": 5,
+             "title": "Chapter 5: Ascension",
+             "sourceText": "<p>Sunny sat in a lotus position, feeling the soul essence flow...</p>"
+           },
+           "translationModel": {
+             "platform": {
+               "name": "aihubmix",
+               "model": { "name": "gpt-4o" }
+             }
+           },
+           "systemPrompt": {
+             "name": "wuxia_tone",
+             "promptText": "You are a professional literary translator specializing in Wuxia and Xianxia web novels."
+           },
+           "mode": "sync"
+         }'
+```
+
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "sync",
+  "series_id": 1,
+  "series_name": "Shadow Slave",
+  "chapter_number": 5,
+  "title": "Chapter 5: Ascension",
+  "status": "translated",
+  "translated_text": "# Chapter 5: Ascension\n\nSunny sat in a lotus position, guiding his soul essence through the meridians...",
+  "plot_summary": "Sunny completes his cultivation breakthrough and ascends.",
+  "extracted_characters_count": 0,
+  "extracted_terms_count": 1
+}
+```
 
 
+---
 
+## 🛠️ 7. Standalone System Prompts Management API (`/api/v1/system-prompts`)
+
+Standalone CRUD management endpoints to create, view, update, and delete System Prompts saved in the SQLite `system_prompts` database table.
+
+### 7.1 List All System Prompts
+- **Method**: `GET`
+- **URL**: `http://localhost:8000/api/v1/system-prompts`
+
+#### cURL
+```bash
+curl -X GET "http://localhost:8000/api/v1/system-prompts"
+```
+
+#### Response Output (`HTTP 200 OK`)
+```json
+[
+  {
+    "id": 1,
+    "name": "default",
+    "prompt_text": "You are a professional literary translator specializing in web novels...",
+    "is_default": true,
+    "created_at": "2026-08-10 10:00:00",
+    "updated_at": "2026-08-10 10:00:00"
+  },
+  {
+    "id": 2,
+    "name": "wuxia_tone",
+    "prompt_text": "You are a professional literary translator specializing in Wuxia and Xianxia web novels...",
+    "is_default": false,
+    "created_at": "2026-08-10 12:43:41",
+    "updated_at": "2026-08-10 12:43:41"
+  }
+]
+```
+
+---
+
+### 7.2 Create System Prompt
+- **Method**: `POST`
+- **URL**: `http://localhost:8000/api/v1/system-prompts`
+
+#### Request Payload
+```json
+{
+  "name": "formal_tone",
+  "promptText": "You are a formal literary translator. Preserve high register vocabulary and formal dialogue.",
+  "isDefault": false
+}
+```
+
+#### cURL
+```bash
+curl -X POST "http://localhost:8000/api/v1/system-prompts" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "name": "formal_tone",
+           "promptText": "You are a formal literary translator. Preserve high register vocabulary and formal dialogue.",
+           "isDefault": false
+         }'
+```
+
+#### Response Output (`HTTP 201 Created`)
+```json
+{
+  "id": 3,
+  "name": "formal_tone",
+  "prompt_text": "You are a formal literary translator. Preserve high register vocabulary and formal dialogue.",
+  "is_default": false,
+  "created_at": "2026-08-10 12:48:00",
+  "updated_at": "2026-08-10 12:48:00"
+}
+```
+
+---
+
+### 7.3 Get System Prompt by ID
+- **Method**: `GET`
+- **URL**: `http://localhost:8000/api/v1/system-prompts/3`
+
+#### cURL
+```bash
+curl -X GET "http://localhost:8000/api/v1/system-prompts/3"
+```
+
+#### Response Output (`HTTP 200 OK`)
+```json
+{
+  "id": 3,
+  "name": "formal_tone",
+  "prompt_text": "You are a formal literary translator. Preserve high register vocabulary and formal dialogue.",
+  "is_default": false,
+  "created_at": "2026-08-10 12:48:00",
+  "updated_at": "2026-08-10 12:48:00"
+}
+```
+
+---
+
+### 7.4 Update System Prompt by ID
+- **Method**: `PATCH`
+- **URL**: `http://localhost:8000/api/v1/system-prompts/3`
+
+#### Request Payload
+```json
+{
+  "promptText": "Updated instructions for formal literary translation..."
+}
+```
+
+#### cURL
+```bash
+curl -X PATCH "http://localhost:8000/api/v1/system-prompts/3" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "promptText": "Updated instructions for formal literary translation..."
+         }'
+```
+
+#### Response Output (`HTTP 200 OK`)
+```json
+{
+  "id": 3,
+  "name": "formal_tone",
+  "prompt_text": "Updated instructions for formal literary translation...",
+  "is_default": false,
+  "created_at": "2026-08-10 12:48:00",
+  "updated_at": "2026-08-10 12:48:30"
+}
+```
+
+---
+
+### 7.5 Set System Prompt as Default
+- **Method**: `POST`
+- **URL**: `http://localhost:8000/api/v1/system-prompts/3/set-default`
+
+#### cURL
+```bash
+curl -X POST "http://localhost:8000/api/v1/system-prompts/3/set-default"
+```
+
+#### Response Output (`HTTP 200 OK`)
+```json
+{
+  "id": 3,
+  "name": "formal_tone",
+  "prompt_text": "Updated instructions for formal literary translation...",
+  "is_default": true,
+  "created_at": "2026-08-10 12:48:00",
+  "updated_at": "2026-08-10 12:49:00"
+}
+```
+
+---
+
+### 7.6 Delete System Prompt by ID
+- **Method**: `DELETE`
+- **URL**: `http://localhost:8000/api/v1/system-prompts/2`
+
+#### cURL
+```bash
+curl -X DELETE "http://localhost:8000/api/v1/system-prompts/2"
+```
+
+#### Response Output (`HTTP 204 No Content`)
+```text
+(Empty Body)
+```
+
+---
+
+## 📦 8. Snapshots & Database Backups API
+
+### 8.1 Get Snapshot & Database Info
+- **Method**: `GET`
+- **URL**: `http://localhost:8000/api/v1/snapshots/info`
+
+#### cURL
+```bash
+curl -X GET "http://localhost:8000/api/v1/snapshots/info" \
+     -H "Accept: application/json"
+```
+
+#### Response Output (`HTTP 200 OK`)
+```json
+{
+  "database_file": "novel_trans.db",
+  "database_size_bytes": 106496,
+  "database_size_human": "0.10 MB",
+  "last_modified": "2026-08-10T20:01:37.970492",
+  "tables": {
+    "system_prompts": 1,
+    "platforms": 1,
+    "models": 1,
+    "settings": 1,
+    "series": 1,
+    "glossary_terms": 0,
+    "characters": 0,
+    "chapters": 0,
+    "jobs": 0
+  }
+}
+```
+
+---
+
+### 8.2 Export System Snapshot (Download Backup)
+- **Method**: `GET`
+- **URL**: `http://localhost:8000/api/v1/snapshots/export?format=zip`
+- **Query Parameters**:
+  - `format` (string, `zip` or `json`, default `zip`)
+
+#### cURL (Download ZIP Archive)
+```bash
+curl -X GET "http://localhost:8000/api/v1/snapshots/export?format=zip" \
+     -O -J
+```
+
+#### cURL (Download JSON Export)
+```bash
+curl -X GET "http://localhost:8000/api/v1/snapshots/export?format=json" \
+     -O -J
+```
+
+#### Python (`httpx`)
+```python
+import httpx
+
+response = httpx.get("http://localhost:8000/api/v1/snapshots/export?format=zip")
+with open("backup.zip", "wb") as f:
+    f.write(response.content)
+print("Backup downloaded successfully.")
+```
+
+#### Response Headers (`HTTP 200 OK`)
+```http
+Content-Type: application/zip
+Content-Disposition: attachment; filename="snapshot_20260810_200500.zip"
+```
+
+---
+
+### 8.3 Restore Database Snapshot (Upload Backup)
+- **Method**: `POST`
+- **URL**: `http://localhost:8000/api/v1/snapshots/restore`
+- **Content-Type**: `multipart/form-data`
+
+#### cURL (Upload ZIP Backup)
+```bash
+curl -X POST "http://localhost:8000/api/v1/snapshots/restore" \
+     -F "file=@snapshot_20260810_200500.zip"
+```
+
+#### cURL (Upload JSON Backup)
+```bash
+curl -X POST "http://localhost:8000/api/v1/snapshots/restore" \
+     -F "file=@snapshot_20260810_200500.json"
+```
+
+#### Python (`httpx`)
+```python
+import httpx
+
+files = {"file": open("backup.zip", "rb")}
+response = httpx.post("http://localhost:8000/api/v1/snapshots/restore", files=files)
+print(response.json())
+```
+
+#### Response Output (`HTTP 200 OK`)
+```json
+{
+  "status": "success",
+  "message": "Snapshot database restored successfully.",
+  "restored_at": "2026-08-10T20:02:03.199947",
+  "file_restored": "snapshot_20260810_200500.zip",
+  "restored_tables": {
+    "system_prompts": 1,
+    "platforms": 1,
+    "models": 1,
+    "settings": 1,
+    "series": 1,
+    "glossary_terms": 0,
+    "characters": 0,
+    "chapters": 0,
+    "jobs": 0
+  }
+}
+```

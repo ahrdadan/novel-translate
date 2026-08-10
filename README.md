@@ -103,6 +103,91 @@ All API endpoints are prefixed with `/api/v1`.
 ### 1. Unified All-In-One API (Recommended)
 - `POST /api/v1/translate-novel` - Create/resolve Series, Chapter (HTML or raw text), Platform, Model, and execute translation in a single request.
 
+> [!NOTE]
+> See [API_REQUESTS_SAMPLES.md: 📋 6.1 Complete Endpoint Parameter Specification Table](file:///d:/Project_/2026/python/novel-trans-app/documentation/API_REQUESTS_SAMPLES.md#61-complete-endpoint-parameter-specification-table) for full parameter documentation and cURL examples.
+
+#### 📋 Complete Endpoint Parameter Specification Table
+
+| Parameter / Field | Type | Status | Default | Description & Resolution Rule |
+|---|---|---|---|---|
+| **`series`** | `Object` \| `Integer` \| `String` | **Required** | — | **Series Reference**: Object `{"name": "..."}`, ID integer `1`, or string `"Shadow Slave"`. Resolved by ID or Name if existing; created automatically if Name is not found. |
+| `series.id` | `Integer` | *Optional* | `null` | Existing Series ID in database. |
+| `series.name` | `String` | *Optional* | `null` | Series title. If series already exists, resolved by Name. If missing, creates a new series. |
+| `series.author` | `String` | *Optional* | `null` | Author name (used only when creating a new series). |
+| `series.description` | `String` | *Optional* | `null` | Series synopsis (used only when creating a new series). |
+| **`chapter`** | `Object` \| `Integer` | **Required** | — | **Chapter Input**: Object or integer chapter number `1`. |
+| `chapter.chapterNumber` | `Integer` | **Required** | — | Chapter sequence number (e.g., `1`, `2`). |
+| `chapter.title` | `String` | *Optional* | `null` | Chapter title. |
+| `chapter.sourceText` | `String` | **Required*** | `null` | Raw text or HTML string. **Required for new chapters**. *Optional if chapter already exists in DB*. |
+| `chapter.sourceLanguage` | `String` | *Optional* | `"auto"` | Source language code (`"auto"`, `"zh"`, `"ja"`, `"ko"`). |
+| **`translationModel`** | `Object` \| `Integer` | *Optional* | `null` | **Translation Model Reference**: Integer ID `2`, or platform object. |
+| `translationModel.modelId` | `Integer` | *Optional* | `null` | Direct model ID from database. |
+| `translationModel.platform` | `Object` | *Optional* | `null` | Platform object containing `name` or `id`, and single `model` or `models` array. |
+| `translationModel.platform.id` | `Integer` | *Optional* | `null` | Existing Platform ID. |
+| `translationModel.platform.name` | `String` | *Optional* | `null` | Platform provider name (e.g., `"aihubmix"`). Resolves existing or creates new. |
+| `translationModel.platform.apiKey` | `String` | *Optional* | `null` | API key credential for provider. |
+| `translationModel.platform.apiType` | `String` | *Optional* | `"chat-completions"` | API protocol format (`"chat-completions"`, `"responses"`, `"messages"`). |
+| `translationModel.platform.model` | `Object` | *Optional* | `null` | **Single Model Object (1 Chapter 1 Model)**: `{"name": "gpt-4o", "url": "..."}`. |
+| `translationModel.platform.models` | `Array` | *Optional* | `null` | **Multiple Models Array**: `[{"name": "gpt-4o"}, {"name": "claude-3-5-sonnet"}]`. |
+| **`extractionModel`** | `Object` \| `Integer` | *Optional* | `null` | Extraction Model Reference (same structure as `translationModel`). |
+| **`systemPrompt`** | `Object` \| `Integer` \| `String` | *Optional* | `null` | **System Prompt Reference**: Select existing prompt by ID `2`, by Name `"default"`, or create on-the-fly `{"name": "wuxia_tone", "promptText": "..."}`. |
+| `systemPrompt.id` | `Integer` | *Optional* | `null` | Existing System Prompt ID in database. |
+| `systemPrompt.name` | `String` | *Optional* | `null` | System Prompt name (e.g., `"default"`, `"formal"`, `"wuxia_tone"`). |
+| `systemPrompt.promptText` | `String` | *Optional* | `null` | Prompt text content. If `name` is new, creates a new prompt in DB; if `name` exists, updates prompt text. |
+| **`mode`** | `String` | *Optional* | `"sync"` | Execution mode: `"sync"` (blocking response) or `"async"` (job queue polling). |
+| **`forceTranslate`** | `Boolean` | *Optional* | `false` | Set `true` to force re-translating an already translated chapter. |
+| **`forceSummary`** | `Boolean` | *Optional* | `false` | Set `true` to force re-generating chapter plot summary. |
+| **`extract`** | `Boolean` | *Optional* | `true` | Set `true` to auto-extract newly introduced characters and glossary terms. |
+
+#### Example Quickstart Request (New Series + HTML Chapter + New Platform/Model):
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate-novel" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "series": {
+             "name": "Lord of the Mysteries",
+             "author": "Cuttlefish That Loves Diving",
+             "description": "With the rising tide of steam and machinery..."
+           },
+           "chapter": {
+             "chapterNumber": 1,
+             "title": "Chapter 1: Crimson",
+             "sourceText": "<div><h1>Chapter 1</h1><p>Pain. Painful. Painful in the head.</p></div>"
+           },
+           "translationModel": {
+             "platform": {
+               "name": "aihubmix",
+               "apiKey": "sk-aihubmix-secret-key-12345",
+               "apiType": "chat-completions",
+               "model": {
+                 "name": "gpt-4o",
+                 "url": "https://aihubmix.com/v1"
+               }
+             }
+           },
+           "mode": "sync",
+           "extract": true
+         }'
+```
+
+#### Example JSON Response:
+```json
+{
+  "mode": "sync",
+  "series_id": 1,
+  "series_name": "Lord of the Mysteries",
+  "chapter_number": 1,
+  "title": "Chapter 1: Crimson",
+  "status": "translated",
+  "translated_text": "# Chapter 1: Crimson\n\nPain. Painful. Painful in the head...",
+  "plot_summary": "The protagonist wakes up in a dark room with severe head trauma.",
+  "extracted_characters_count": 1,
+  "extracted_terms_count": 0
+}
+```
+
+
+
 ### 2. Global Settings
 - `GET /api/v1/settings` - Retrieve global configuration.
 - `PATCH /api/v1/settings` - Update `max_concurrent_jobs`, default translation/extraction models.
@@ -123,6 +208,15 @@ All API endpoints are prefixed with `/api/v1`.
 - `POST /api/v1/series/{id}/chapters/{n}/translate` - Trigger chapter translation (sync/async).
 - `GET /api/v1/jobs/{job_id}` - Check async job status & result.
 - `GET /api/v1/jobs` - List jobs with optional status/series filters.
+
+### 6. System Prompts Management
+- `GET /api/v1/system-prompts` - List all system prompts in database.
+- `POST /api/v1/system-prompts` - Create a new system prompt.
+- `GET /api/v1/system-prompts/{id}` - Get system prompt details by ID.
+- `PATCH /api/v1/system-prompts/{id}` - Update a system prompt text or name.
+- `POST /api/v1/system-prompts/{id}/set-default` - Set a system prompt as global default.
+- `DELETE /api/v1/system-prompts/{id}` - Delete a system prompt.
+
 
 
 ---

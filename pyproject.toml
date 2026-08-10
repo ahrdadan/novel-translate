@@ -11,4 +11,5 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "httpx>=0.28.0",
     "pydantic>=2.11.0",
+    "python-multipart>=0.0.9",
 ]

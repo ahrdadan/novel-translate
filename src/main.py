@@ -21,6 +21,7 @@ from src.routers.models import router as models_router
 from src.routers.platforms import router as platforms_router
 from src.routers.series import router as series_router
 from src.routers.settings import router as settings_router
+from src.routers.snapshots import router as snapshots_router
 from src.routers.system_prompts import router as system_prompts_router
 from src.routers.translate import router as translate_router
 from src.routers.unified_translate import router as unified_translate_router
@@ -83,6 +84,7 @@ app.include_router(translate_router, prefix=API_PREFIX)
 app.include_router(unified_translate_router, prefix=API_PREFIX)
 app.include_router(jobs_router, prefix=API_PREFIX)
 app.include_router(system_prompts_router, prefix=API_PREFIX)
+app.include_router(snapshots_router, prefix=API_PREFIX)
 
 
 

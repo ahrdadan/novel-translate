@@ -12,6 +12,7 @@ from src.models.system_prompt import SystemPromptReference
 from src.models.unified import ModelReferenceInput, UnifiedTranslateRequest
 from src.repositories import chapter_repo, series_repo
 from src.routers.translate import _handle_async, _handle_sync
+from src.services import prompt_resolver
 
 router = APIRouter(tags=["translate"])
 
@@ -40,17 +41,28 @@ def _model_ref_to_dict(ref: ModelReferenceInput | int | str | dict | None) -> di
     return None
 
 
-def _prompt_ref_to_dict(ref: SystemPromptReference | None) -> dict | None:
+def _prompt_ref_to_dict(
+    ref: SystemPromptReference | int | str | dict | None,
+) -> dict | int | str | None:
     if ref is None:
         return None
-    if ref.system_prompt_id is not None:
-        return {"system_prompt_id": ref.system_prompt_id}
-    if ref.prompt_text:
-        res = {"prompt_text": ref.prompt_text}
+    if isinstance(ref, (int, str)):
+        return ref
+    if isinstance(ref, dict):
+        return ref
+    if isinstance(ref, SystemPromptReference):
+        if ref.system_prompt_id is not None:
+            return {"system_prompt_id": ref.system_prompt_id}
+        if ref.id is not None:
+            return {"system_prompt_id": ref.id}
+        res: dict = {}
         if ref.name:
             res["name"] = ref.name
-        return res
+        if ref.prompt_text:
+            res["prompt_text"] = ref.prompt_text
+        return res if res else None
     return None
+
 
 
 @router.post("/translate-novel", status_code=200)
@@ -160,9 +172,14 @@ async def translate_novel_unified(body: UnifiedTranslateRequest):
     # 4. Build Model & Prompt References
     trans_ref = _model_ref_to_dict(body.translation_model)
     extract_ref = _model_ref_to_dict(body.extraction_model)
-    prompt_ref = _prompt_ref_to_dict(body.system_prompt)
+    prompt_ref_raw = _prompt_ref_to_dict(body.system_prompt)
+    prompt_ref = None
+    if prompt_ref_raw:
+        prompt_obj = await prompt_resolver.resolve_or_create_system_prompt(prompt_ref_raw)
+        prompt_ref = {"system_prompt_id": prompt_obj["id"]} if prompt_obj.get("id") else prompt_ref_raw
 
     # 5. Dispatch Execution Mode
+
     if body.mode == "async":
         result = await _handle_async(series_id, chapter_num_input, body, trans_ref, extract_ref, prompt_ref)
         result["series_id"] = series_id
