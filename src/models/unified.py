@@ -29,7 +29,7 @@ class InlineSeriesInput(BaseModel):
 
 class InlineChapterInput(BaseModel):
     """Chapter input: chapter_number and source text or HTML."""
-    chapter_number: int = Field(..., alias="chapterNumber")
+    chapter_number: float = Field(..., alias="chapterNumber")
     title: str | None = None
     source_text: str | None = Field(None, alias="sourceText")
     source_language: str = Field("auto", alias="sourceLanguage")
@@ -42,12 +42,15 @@ class UnifiedTranslateRequest(BaseModel):
     series: InlineSeriesInput | int | str
     chapter: InlineChapterInput | int | str
     mode: str = "sync"  # "sync" | "async"
+    strategy: str = "pipeline"  # "pipeline" | "single_pass"
     force_translate: bool = Field(False, alias="forceTranslate")
     force_summary: bool = Field(False, alias="forceSummary")
     extract: bool = True
     translation_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="translationModel")
+    summarize_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="summarizeModel")
     extraction_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="extractionModel")
     system_prompt: SystemPromptReference | int | str | dict | None = Field(None, alias="systemPrompt")
 
     model_config = {"populate_by_name": True}
+
 

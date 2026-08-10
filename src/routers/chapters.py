@@ -36,7 +36,7 @@ async def list_chapters(series_id: int):
 
 
 @router.get("/{chapter_number}", response_model=ChapterResponse)
-async def get_chapter(series_id: int, chapter_number: int):
+async def get_chapter(series_id: int, chapter_number: float):
     chapter = await chapter_repo.get_chapter(series_id, chapter_number)
     if not chapter:
         raise HTTPException(404, "Chapter not found")
@@ -44,7 +44,7 @@ async def get_chapter(series_id: int, chapter_number: int):
 
 
 @router.patch("/{chapter_number}", response_model=ChapterResponse)
-async def update_chapter(series_id: int, chapter_number: int, body: ChapterUpdate):
+async def update_chapter(series_id: int, chapter_number: float, body: ChapterUpdate):
     chapter = await chapter_repo.get_chapter(series_id, chapter_number)
     if not chapter:
         raise HTTPException(404, "Chapter not found")
@@ -53,7 +53,7 @@ async def update_chapter(series_id: int, chapter_number: int, body: ChapterUpdat
 
 
 @router.delete("/{chapter_number}", status_code=204)
-async def delete_chapter(series_id: int, chapter_number: int):
+async def delete_chapter(series_id: int, chapter_number: float):
     chapter = await chapter_repo.get_chapter(series_id, chapter_number)
     if not chapter:
         raise HTTPException(404, "Chapter not found")
@@ -63,7 +63,7 @@ async def delete_chapter(series_id: int, chapter_number: int):
 # --- Context preview (PRD §6.8) ---
 
 @router.get("/{chapter_number}/context", response_model=ChapterContextResponse)
-async def get_chapter_context(series_id: int, chapter_number: int):
+async def get_chapter_context(series_id: int, chapter_number: float):
     """Return context preview: previous chapter summary + glossary + characters."""
     series = await series_repo.get_series_by_id(series_id)
     if not series:

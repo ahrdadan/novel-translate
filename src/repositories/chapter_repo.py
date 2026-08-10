@@ -25,7 +25,7 @@ async def get_chapter_by_id(chapter_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-async def get_chapter(series_id: int, chapter_number: int) -> dict | None:
+async def get_chapter(series_id: int, chapter_number: float) -> dict | None:
     db = await get_db()
     cursor = await db.execute(
         "SELECT * FROM chapters WHERE series_id = ? AND chapter_number = ?",
@@ -72,7 +72,7 @@ async def delete_chapter(chapter_id: int) -> bool:
     return cursor.rowcount > 0
 
 
-async def get_previous_chapter_summary(series_id: int, chapter_number: int) -> str | None:
+async def get_previous_chapter_summary(series_id: int, chapter_number: float) -> str | None:
     """Get the chapter_summary of the previous chapter for context."""
     db = await get_db()
     cursor = await db.execute(

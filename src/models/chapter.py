@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class ChapterCreate(BaseModel):
-    chapter_number: int
+    chapter_number: float
     title: str | None = None
     source_text: str
     source_language: str | None = "auto"
@@ -21,7 +21,7 @@ class ChapterUpdate(BaseModel):
 class ChapterResponse(BaseModel):
     id: int
     series_id: int
-    chapter_number: int
+    chapter_number: float
     title: str | None = None
     source_text: str
     source_language: str | None = None
@@ -44,7 +44,7 @@ class ChapterListItem(BaseModel):
     """Lighter response for chapter listing (no full text)."""
     id: int
     series_id: int
-    chapter_number: int
+    chapter_number: float
     title: str | None = None
     status: str
     extract_status: str
@@ -56,7 +56,7 @@ class ChapterListItem(BaseModel):
 
 class ChapterContextResponse(BaseModel):
     """Context preview for a chapter (summary of previous chapters)."""
-    chapter_number: int
+    chapter_number: float
     previous_summary: str | None = None
     glossary: list[dict] = []
     characters: list[dict] = []

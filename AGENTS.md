@@ -131,6 +131,14 @@ All agents communicate with LLMs through standardized adapter classes in `src/se
 | `responses` | `ResponsesAdapter` | OpenAI `/v1/responses` format | OpenAI API modern endpoints |
 | `messages` | `MessagesAdapter` | Anthropic `/v1/messages` schema | Anthropic Claude, Claude-compatible proxies |
 
+### Smart Base URL Normalization
+All LLM adapters feature automatic URL normalization. Whether the configured model `url` is provided as:
+- Root domain: `https://aihubmix.com`
+- Versioned path: `https://aihubmix.com/v1`
+- Full endpoint: `https://aihubmix.com/v1/chat/completions`
+
+The adapter automatically normalizes the URL to prevent double `/v1/v1` or duplicate endpoint path suffixes.
+
 ---
 
 ## 🔄 Agent Workflows & State Machine

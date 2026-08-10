@@ -9,4 +9,11 @@ wheels/
 # Virtual environments
 .venv
 
+# Novel folders
 novel-*/
+
+data/*
+
+# Environment files
+.env
+.env.*

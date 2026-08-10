@@ -45,7 +45,35 @@ async def get_job_by_id(job_id: int) -> dict | None:
     job["force_translate"] = bool(job.get("force_translate", 0))
     job["force_summary"] = bool(job.get("force_summary", 0))
     job["extract"] = bool(job.get("extract", 1))
+
+    if job["status"] in ("queued", "processing"):
+        q_info = await get_job_queue_info(job_id)
+        job["queue_position"] = q_info["queue_position"]
+        job["total_in_queue"] = q_info["total_in_queue"]
+
     return job
+
+
+async def get_job_queue_info(job_id: int) -> dict[str, int]:
+    """Calculate the queue position of a job and total active queued/processing jobs."""
+    db = await get_db()
+    c_total = await db.execute(
+        "SELECT COUNT(*) FROM jobs WHERE status IN ('queued', 'processing')"
+    )
+    r_total = await c_total.fetchone()
+    total_count = r_total[0] if r_total else 0
+
+    c_pos = await db.execute(
+        "SELECT COUNT(*) FROM jobs WHERE status IN ('queued', 'processing') AND id <= ?",
+        (job_id,),
+    )
+    r_pos = await c_pos.fetchone()
+    queue_position = r_pos[0] if r_pos else 0
+
+    return {
+        "queue_position": queue_position,
+        "total_in_queue": total_count,
+    }
 
 
 async def get_next_queued() -> dict | None:
@@ -65,6 +93,72 @@ async def get_next_queued() -> dict | None:
     job["force_summary"] = bool(job.get("force_summary", 0))
     job["extract"] = bool(job.get("extract", 1))
     return job
+
+
+async def claim_next_queued() -> dict | None:
+    """Atomically select the next queued job and update its status to 'processing'."""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT id FROM jobs WHERE status = 'queued' ORDER BY id LIMIT 1"
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+
+    job_id = row["id"]
+    now = datetime.now(UTC).isoformat()
+    res = await db.execute(
+        "UPDATE jobs SET status = 'processing', started_at = ? WHERE id = ? AND status = 'queued'",
+        (now, job_id),
+    )
+    await db.commit()
+    if res.rowcount == 0:
+        return None
+
+    return await get_job_by_id(job_id)
+
+
+async def reset_stuck_jobs(timeout_minutes: int = 15) -> list[dict]:
+    """Find jobs stuck in 'processing' for longer than timeout_minutes and reset to 'queued'."""
+    db = await get_db()
+    stuck_jobs = await get_jobs_by_status(["processing"])
+    reset_jobs = []
+    now = datetime.now(UTC)
+
+    for job in stuck_jobs:
+        started_at_str = job.get("started_at")
+        is_stuck = False
+        if not started_at_str:
+            is_stuck = True
+        else:
+            try:
+                started_dt = datetime.fromisoformat(started_at_str)
+                # Ensure timezone awareness match
+                if started_dt.tzinfo is None:
+                    started_dt = started_dt.replace(tzinfo=UTC)
+                if (now - started_dt).total_seconds() > (timeout_minutes * 60):
+                    is_stuck = True
+            except Exception:
+                is_stuck = True
+
+        if is_stuck:
+            await update_job_status(job["id"], "queued")
+            reset_jobs.append(job)
+
+    return reset_jobs
+
+
+async def cancel_job(job_id: int) -> dict | None:
+    """Cancel a queued or processing job, marking it as failed."""
+    job = await get_job_by_id(job_id)
+    if not job:
+        return None
+
+    if job["status"] in ("completed", "failed"):
+        return job
+
+    await update_job_status(job_id, "failed", error="Cancelled by user")
+    return await get_job_by_id(job_id)
 
 
 async def update_job_status(
@@ -116,8 +210,16 @@ async def list_jobs(
         query += " AND series_id = ?"
         params.append(series_id)
     if status is not None:
-        query += " AND status = ?"
-        params.append(status)
+        status_list = [s.strip().lower() for s in status.split(",") if s.strip()]
+        # Alias 'pending' -> 'queued' for user convenience
+        status_list = ["queued" if s == "pending" else s for s in status_list]
+        if len(status_list) == 1:
+            query += " AND status = ?"
+            params.append(status_list[0])
+        elif len(status_list) > 1:
+            placeholders = ", ".join(["?"] * len(status_list))
+            query += f" AND status IN ({placeholders})"
+            params.extend(status_list)
     query += " ORDER BY id DESC LIMIT ?"
     params.append(limit)
     cursor = await db.execute(query, params)
@@ -130,5 +232,11 @@ async def list_jobs(
         job["force_translate"] = bool(job.get("force_translate", 0))
         job["force_summary"] = bool(job.get("force_summary", 0))
         job["extract"] = bool(job.get("extract", 1))
+
+        if job["status"] in ("queued", "processing"):
+            q_info = await get_job_queue_info(job["id"])
+            job["queue_position"] = q_info["queue_position"]
+            job["total_in_queue"] = q_info["total_in_queue"]
+
         jobs.append(job)
     return jobs

@@ -1,0 +1,26 @@
+{
+  "series": {
+    "name": "Lee Ha-young (New Platform Demo)",
+    "originalTitle": "이하영",
+    "author": "Web Novel Author",
+    "description": "Multiple HTML chapters translated by registering a new Platform & Model inline on-the-fly",
+    "sourceLanguage": "English",
+    "targetLanguage": "Indonesian"
+  },
+  "chaptersFolder": "novel-html2",
+  "translationModel": {
+    "platform": {
+      "name": "tokenrouter",
+      "apiKey": "sk-UTb31l18hcaiUNXxY3JZFo2rHTtE4R0VGuqqt5q5ApaBzslv",
+      "apiType": "chat-completions",
+      "models": [
+        {
+          "name": "moonshotai/kimi-k3-free",
+          "url": "https://api.tokenrouter.com/v1"
+        }
+      ]
+    }
+  },
+  "mode": "async",
+  "strategy": "single_pass"
+}

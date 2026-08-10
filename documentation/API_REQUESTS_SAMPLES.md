@@ -459,7 +459,7 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
            },
            "systemPrompt": "default",
            "mode": "sync",
-           "extract": true
+           "strategy": "pipeline"
          }'
 ```
 
@@ -467,6 +467,7 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
 ```json
 {
   "mode": "sync",
+  "strategy": "pipeline",
   "series_id": 1,
   "series_name": "Shadow Slave",
   "chapter_number": 2,
@@ -477,6 +478,40 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
   "extracted_characters_count": 1,
   "extracted_terms_count": 0
 }
+```
+
+#### Single-Pass Request Example (`"strategy": "single_pass"`)
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate-novel" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "series": {
+             "name": "Shadow Slave"
+           },
+           "chapter": {
+             "chapterNumber": 3,
+             "title": "Chapter 3: The Sleeper",
+             "sourceText": "<div><h1>Chapter 3</h1><p>Sunny moved carefully across the obsidian floor.</p></div>"
+           },
+           "translationModel": {
+             "platform": {
+               "name": "aihubmix",
+               "model": {
+                 "name": "gpt-4o"
+               }
+             }
+           },
+           "summarizeModel": {
+             "platform": {
+               "name": "aihubmix",
+               "model": {
+                 "name": "gpt-4o-mini"
+               }
+             }
+           },
+           "strategy": "single_pass",
+           "mode": "sync"
+         }'
 ```
 
 ---
@@ -507,13 +542,23 @@ Creates a new Series, parses/cleans raw HTML chapter text, registers new Platfor
       }
     }
   },
+  "summarizeModel": {
+    "platform": {
+      "name": "aihubmix",
+      "apiKey": "sk-aihubmix-secret-key-12345",
+      "apiType": "chat-completions",
+      "model": {
+        "name": "gpt-4o-mini"
+      }
+    }
+  },
   "systemPrompt": "default",
   "mode": "sync",
-  "extract": true
+  "strategy": "pipeline"
 }
 ```
 
-#### cURL
+#### cURL (Pipeline Mode with Dedicated Summarize Model)
 ```bash
 curl -X POST "http://localhost:8000/api/v1/translate-novel" \
      -H "Content-Type: application/json" \
@@ -539,9 +584,19 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
                }
              }
            },
+           "summarizeModel": {
+             "platform": {
+               "name": "aihubmix",
+               "apiKey": "sk-aihubmix-secret-key-12345",
+               "apiType": "chat-completions",
+               "model": {
+                 "name": "gpt-4o-mini"
+               }
+             }
+           },
            "systemPrompt": "default",
            "mode": "sync",
-           "extract": true
+           "strategy": "pipeline"
          }'
 ```
 
@@ -549,6 +604,7 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
 ```json
 {
   "mode": "sync",
+  "strategy": "pipeline",
   "series_id": 2,
   "series_name": "Lord of the Mysteries",
   "chapter_number": 1,
@@ -558,6 +614,50 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
   "plot_summary": "Zhou Mingrui awakens as Klein Moretti in Tingen City with severe head trauma.",
   "extracted_characters_count": 1,
   "extracted_terms_count": 1
+}
+```
+
+#### cURL (Single-Pass Mode: All-in-One 1 LLM Call)
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate-novel" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "series": {
+             "name": "Lord of the Mysteries"
+           },
+           "chapter": {
+             "chapterNumber": 2,
+             "title": "Chapter 2: The Situation",
+             "sourceText": "<div><h1>Chapter 2</h1><p>Klein sat by the desk looking at the notebook.</p></div>"
+           },
+           "translationModel": {
+             "platform": {
+               "name": "aihubmix",
+               "model": {
+                 "name": "gpt-4o"
+               }
+             }
+           },
+           "strategy": "single_pass",
+           "mode": "sync"
+         }'
+```
+
+#### Response Output Payload (`HTTP 200 OK`)
+```json
+{
+  "mode": "sync",
+  "strategy": "single_pass",
+  "series_id": 2,
+  "series_name": "Lord of the Mysteries",
+  "chapter_number": 2,
+  "title": "Chapter 2: The Situation",
+  "status": "translated",
+  "translated_text": "# Chapter 2: The Situation\n\nKlein sat by the desk looking at the notebook...",
+  "chapter_summary": "Klein examines his surroundings, reviews his brother and sister's condition, and discovers mysterious journal entries.",
+  "extract_status": "done",
+  "translated_by_model_name": "gpt-4o",
+  "source_language": "auto"
 }
 ```
 

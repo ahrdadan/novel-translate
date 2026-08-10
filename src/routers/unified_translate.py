@@ -14,7 +14,7 @@ from src.repositories import chapter_repo, series_repo
 from src.routers.translate import _handle_async, _handle_sync
 from src.services import prompt_resolver
 
-router = APIRouter(tags=["translate"])
+router = APIRouter(tags=["⚡ Quickstart Translate"])
 
 
 def _model_ref_to_dict(ref: ModelReferenceInput | int | str | dict | None) -> dict | int | None:
@@ -171,6 +171,7 @@ async def translate_novel_unified(body: UnifiedTranslateRequest):
 
     # 4. Build Model & Prompt References
     trans_ref = _model_ref_to_dict(body.translation_model)
+    summarize_ref = _model_ref_to_dict(body.summarize_model)
     extract_ref = _model_ref_to_dict(body.extraction_model)
     prompt_ref_raw = _prompt_ref_to_dict(body.system_prompt)
     prompt_ref = None
@@ -181,13 +182,14 @@ async def translate_novel_unified(body: UnifiedTranslateRequest):
     # 5. Dispatch Execution Mode
 
     if body.mode == "async":
-        result = await _handle_async(series_id, chapter_num_input, body, trans_ref, extract_ref, prompt_ref)
+        result = await _handle_async(series_id, chapter_num_input, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
         result["series_id"] = series_id
         result["series_name"] = series["name"]
         return result
     else:
-        result = await _handle_sync(series_id, chapter_num_input, chapter, body, trans_ref, extract_ref, prompt_ref)
+        result = await _handle_sync(series_id, chapter_num_input, chapter, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
         result["series_id"] = series_id
         result["series_name"] = series["name"]
         return result
+
 

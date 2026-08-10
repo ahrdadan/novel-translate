@@ -1,20 +1,29 @@
 """Router for database snapshot export and restore operations."""
 
-from datetime import datetime
 import json
 import logging
 import os
 import shutil
+import sqlite3
 import tempfile
 import zipfile
-from pathlib import Path
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 import aiosqlite
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 
-from src.database import DATABASE_PATH, close_db, get_db, init_db
+from src.database import DATABASE_PATH, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +49,13 @@ def _cleanup_file(path: str) -> None:
             shutil.rmtree(path, ignore_errors=True)
         elif os.path.exists(path):
             os.remove(path)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Failed to clean up temp path %s: %s", path, e)
 
 
+
 @router.get("/info")
-async def get_snapshot_info(db: aiosqlite.Connection = Depends(get_db)) -> Dict[str, Any]:
+async def get_snapshot_info(db: aiosqlite.Connection = Depends(get_db)) -> dict[str, Any]:  # noqa: B008
     """Get database file information and row counts for all tables."""
     table_counts = {}
     for table in TABLES_IN_ORDER:
@@ -53,12 +63,12 @@ async def get_snapshot_info(db: aiosqlite.Connection = Depends(get_db)) -> Dict[
             cursor = await db.execute(f"SELECT COUNT(*) FROM {table}")
             row = await cursor.fetchone()
             table_counts[table] = row[0] if row else 0
-        except Exception:
+        except sqlite3.Error:
             table_counts[table] = 0
 
     db_size = DATABASE_PATH.stat().st_size if DATABASE_PATH.exists() else 0
     last_modified = (
-        datetime.fromtimestamp(DATABASE_PATH.stat().st_mtime).isoformat()
+        datetime.fromtimestamp(DATABASE_PATH.stat().st_mtime, tz=UTC).isoformat()
         if DATABASE_PATH.exists()
         else None
     )
@@ -76,10 +86,10 @@ async def get_snapshot_info(db: aiosqlite.Connection = Depends(get_db)) -> Dict[
 async def export_snapshot(
     background_tasks: BackgroundTasks,
     format: str = Query("zip", enum=["zip", "json"], description="Export format: zip or json"),
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db),  # noqa: B008
 ):
     """Export database snapshot as a downloadable ZIP archive or JSON file."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     temp_dir = tempfile.mkdtemp(prefix="snapshot_export_")
 
     if format == "zip":
@@ -90,7 +100,7 @@ async def export_snapshot(
 
         # Collect table stats for manifest
         manifest_data = {
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "app": "Novel Translation API",
             "version": "1.0.0",
             "format": "zip",
@@ -102,7 +112,7 @@ async def export_snapshot(
             manifest_data["tables"][table] = row[0] if row else 0
 
         manifest_path = os.path.join(temp_dir, "manifest.json")
-        with open(manifest_path, "w", encoding="utf-8") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             json.dump(manifest_data, f, indent=2)
 
         zip_filename = f"snapshot_{timestamp}.zip"
@@ -121,8 +131,8 @@ async def export_snapshot(
         )
 
     else:  # format == "json"
-        export_data: Dict[str, Any] = {
-            "created_at": datetime.now().isoformat(),
+        export_data: dict[str, Any] = {
+            "created_at": datetime.now(UTC).isoformat(),
             "app": "Novel Translation API",
             "version": "1.0.0",
             "tables": {},
@@ -135,7 +145,7 @@ async def export_snapshot(
 
         json_filename = f"snapshot_{timestamp}.json"
         json_path = os.path.join(temp_dir, json_filename)
-        with open(json_path, "w", encoding="utf-8") as f:
+        with open(json_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             json.dump(export_data, f, indent=2, ensure_ascii=False)
 
         background_tasks.add_task(_cleanup_file, temp_dir)
@@ -149,8 +159,8 @@ async def export_snapshot(
 
 @router.post("/restore")
 async def restore_snapshot(
-    file: UploadFile = File(...),
-    db: aiosqlite.Connection = Depends(get_db),
+    file: UploadFile = File(...),  # noqa: B008
+    db: aiosqlite.Connection = Depends(get_db),  # noqa: B008
 ):
     """Restore database from an uploaded ZIP archive or JSON snapshot file."""
     filename = file.filename or ""
@@ -158,10 +168,10 @@ async def restore_snapshot(
 
     try:
         upload_path = os.path.join(temp_dir, filename)
-        with open(upload_path, "wb") as buffer:
+        with open(upload_path, "wb") as buffer:  # noqa: ASYNC230
             shutil.copyfileobj(file.file, buffer)
 
-        restored_counts: Dict[str, int] = {}
+        restored_counts: dict[str, int] = {}
 
         if filename.endswith(".zip") or zipfile.is_zipfile(upload_path):
             with zipfile.ZipFile(upload_path, "r") as zipf:
@@ -181,14 +191,14 @@ async def restore_snapshot(
                         cursor = await temp_conn.execute(f"SELECT COUNT(*) FROM {table}")
                         row = await cursor.fetchone()
                         restored_counts[table] = row[0] if row else 0
-                    except Exception:
+                    except sqlite3.Error:
                         restored_counts[table] = 0
 
                 # Perform safe online restore
                 await temp_conn.backup(db)
 
         elif filename.endswith(".json"):
-            with open(upload_path, "r", encoding="utf-8") as f:
+            with open(upload_path, "r", encoding="utf-8") as f:  # noqa: ASYNC230
                 json_data = json.load(f)
 
             if "tables" not in json_data or not isinstance(json_data["tables"], dict):
@@ -237,10 +247,11 @@ async def restore_snapshot(
         return {
             "status": "success",
             "message": "Snapshot database restored successfully.",
-            "restored_at": datetime.now().isoformat(),
+            "restored_at": datetime.now(UTC).isoformat(),
             "file_restored": filename,
             "restored_tables": restored_counts,
         }
 
     finally:
         _cleanup_file(temp_dir)
+

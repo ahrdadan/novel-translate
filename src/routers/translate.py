@@ -7,37 +7,43 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.models.system_prompt import SystemPromptReference
 from src.repositories import chapter_repo, job_repo, platform_repo, series_repo
-from src.services import extractor, model_resolver, summarizer, translator
+from src.services import extractor, model_resolver, single_pass, summarizer, translator
 
 router = APIRouter(prefix="/series/{series_id}/chapters/{chapter_number}", tags=["translate"])
 
 
 class ModelReference(BaseModel):
     """Flexible model reference: either model_id or inline platform with models array."""
-    model_id: int | None = None
+    model_id: int | None = Field(None, alias="modelId")
     platform: dict | None = None
     model: dict | None = None
     models: list[dict] | None = None
 
+    model_config = {"populate_by_name": True}
+
 
 class TranslateRequest(BaseModel):
     mode: str = "sync"  # sync | async
-    force_translate: bool = False
-    force_summary: bool = False
+    strategy: str = "pipeline"  # pipeline | single_pass
+    force_translate: bool = Field(False, alias="forceTranslate")
+    force_summary: bool = Field(False, alias="forceSummary")
     extract: bool = True
-    translation_model: ModelReference | None = None
-    extraction_model: ModelReference | None = None
-    system_prompt: SystemPromptReference | None = None
+    translation_model: ModelReference | None = Field(None, alias="translationModel")
+    summarize_model: ModelReference | None = Field(None, alias="summarizeModel")
+    extraction_model: ModelReference | None = Field(None, alias="extractionModel")
+    system_prompt: SystemPromptReference | None = Field(None, alias="systemPrompt")
+
+    model_config = {"populate_by_name": True}
 
 
 @router.post("/translate")
 async def translate_chapter(
     series_id: int,
-    chapter_number: int,
+    chapter_number: float,
     body: TranslateRequest | None = None,
 ):
     """Translate a chapter — sync (blocking) or async (job queue)."""
@@ -59,13 +65,45 @@ async def translate_chapter(
 
     # Build model & prompt refs as dicts for resolution/storage
     trans_ref = _model_ref_to_dict(body.translation_model) if body.translation_model else None
+    summarize_ref = _model_ref_to_dict(body.summarize_model) if body.summarize_model else None
     extract_ref = _model_ref_to_dict(body.extraction_model) if body.extraction_model else None
     prompt_ref = _prompt_ref_to_dict(body.system_prompt) if body.system_prompt else None
 
     if body.mode == "async":
-        return await _handle_async(series_id, chapter_number, body, trans_ref, extract_ref, prompt_ref)
+        return await _handle_async(series_id, chapter_number, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
     else:
-        return await _handle_sync(series_id, chapter_number, chapter, body, trans_ref, extract_ref, prompt_ref)
+        return await _handle_sync(series_id, chapter_number, chapter, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
+
+
+@router.post("/retranslate")
+@router.post("/retry")
+async def retranslate_chapter(
+    series_id: int,
+    chapter_number: float,
+    body: TranslateRequest | None = None,
+):
+    """Re-translate or retry a chapter (forces re-translation even if previously failed or translated)."""
+    if body is None:
+        body = TranslateRequest()
+
+    body.force_translate = True
+
+    chapter = await chapter_repo.get_chapter(series_id, chapter_number)
+    if not chapter:
+        raise HTTPException(404, f"Chapter {chapter_number} not found in series {series_id}")
+
+    # Reset chapter status to pending to clear previous failure state
+    await chapter_repo.update_chapter(chapter["id"], {"status": "pending", "extract_status": "pending"})
+
+    trans_ref = _model_ref_to_dict(body.translation_model) if body.translation_model else None
+    summarize_ref = _model_ref_to_dict(body.summarize_model) if body.summarize_model else None
+    extract_ref = _model_ref_to_dict(body.extraction_model) if body.extraction_model else None
+    prompt_ref = _prompt_ref_to_dict(body.system_prompt) if body.system_prompt else None
+
+    if body.mode == "async":
+        return await _handle_async(series_id, chapter_number, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
+    else:
+        return await _handle_sync(series_id, chapter_number, chapter, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
 
 
 def _model_ref_to_dict(ref: ModelReference | None) -> dict | None:
@@ -87,7 +125,6 @@ def _model_ref_to_dict(ref: ModelReference | None) -> dict | None:
     return None
 
 
-
 def _prompt_ref_to_dict(ref: SystemPromptReference | None) -> dict | None:
     if ref is None:
         return None
@@ -103,9 +140,10 @@ def _prompt_ref_to_dict(ref: SystemPromptReference | None) -> dict | None:
 
 async def _handle_async(
     series_id: int,
-    chapter_number: int,
+    chapter_number: float,
     body: TranslateRequest,
     trans_ref: dict | None,
+    summarize_ref: dict | None,
     extract_ref: dict | None,
     prompt_ref: dict | None,
 ) -> dict:
@@ -113,10 +151,12 @@ async def _handle_async(
     job = await job_repo.create_job({
         "series_id": series_id,
         "chapter_number": chapter_number,
+        "strategy": body.strategy,
         "force_translate": body.force_translate,
         "force_summary": body.force_summary,
         "extract": body.extract,
         "translation_model_ref": trans_ref,
+        "summarize_model_ref": summarize_ref,
         "extraction_model_ref": extract_ref,
         "system_prompt_ref": prompt_ref,
     })
@@ -130,10 +170,11 @@ async def _handle_async(
 
 async def _handle_sync(
     series_id: int,
-    chapter_number: int,
+    chapter_number: float,
     chapter: dict,
     body: TranslateRequest,
     trans_ref: dict | None,
+    summarize_ref: dict | None,
     extract_ref: dict | None,
     prompt_ref: dict | None,
 ) -> dict:
@@ -144,25 +185,71 @@ async def _handle_sync(
     )
     trans_platform = await platform_repo.get_platform_by_id(trans_model["platform_id"])
 
-    # Translate
-    translated_text = await translator.translate_chapter(
-        source_text=chapter["source_text"],
-        series_id=series_id,
-        chapter_number=chapter_number,
-        model=trans_model,
-        platform=trans_platform,
-        system_prompt_ref=prompt_ref,
-    )
+    if body.strategy == "single_pass":
+        res = await single_pass.translate_chapter_single_pass(
+            source_text=chapter["source_text"],
+            series_id=series_id,
+            chapter_number=chapter_number,
+            model=trans_model,
+            platform=trans_platform,
+            system_prompt_ref=prompt_ref,
+        )
+        translated_text = res["translated_text"]
+        chapter_summary = res["chapter_summary"]
+        extract_status = res["extract_status"]
+    else:
+        # Pipeline strategy
+        # 1. Translate
+        translated_text = await translator.translate_chapter(
+            source_text=chapter["source_text"],
+            series_id=series_id,
+            chapter_number=chapter_number,
+            model=trans_model,
+            platform=trans_platform,
+            system_prompt_ref=prompt_ref,
+        )
 
+        # 2. Summarize (resolve summarize_model if provided, otherwise trans_model)
+        sum_model = trans_model
+        sum_platform = trans_platform
+        if summarize_ref:
+            try:
+                resolved_sum_model = await model_resolver.resolve_model_for_purpose(
+                    "summarization", summarize_ref, series_id
+                )
+                sum_platform = await platform_repo.get_platform_by_id(resolved_sum_model["platform_id"])
+                sum_model = resolved_sum_model
+            except HTTPException:
+                pass
 
-    # Summarize
-    prev_summary = await chapter_repo.get_previous_chapter_summary(series_id, chapter_number)
-    chapter_summary = await summarizer.summarize_chapter(
-        translated_text=translated_text,
-        previous_summary=prev_summary,
-        model=trans_model,
-        platform=trans_platform,
-    )
+        prev_summary = await chapter_repo.get_previous_chapter_summary(series_id, chapter_number)
+        chapter_summary = await summarizer.summarize_chapter(
+            translated_text=translated_text,
+            previous_summary=prev_summary,
+            model=sum_model,
+            platform=sum_platform,
+        )
+
+        # 3. Extract (optional)
+        extract_status = "skipped"
+        if body.extract:
+            try:
+                extract_model = await model_resolver.resolve_model_for_purpose(
+                    "extraction", extract_ref, series_id
+                )
+                extract_platform = await platform_repo.get_platform_by_id(extract_model["platform_id"])
+
+                extract_status = await extractor.extract_from_chapter(
+                    translated_text=translated_text,
+                    series_id=series_id,
+                    model=extract_model,
+                    platform=extract_platform,
+                )
+            except HTTPException:
+                # No extraction model configured — skip extraction silently
+                extract_status = "skipped"
+        else:
+            extract_status = "skipped"
 
     # Update chapter
     now = datetime.now(UTC).isoformat()
@@ -174,33 +261,8 @@ async def _handle_sync(
         "translated_by_model_name": trans_model["name"],
         "translated_by_platform_name": trans_platform["name"],
         "translated_at": now,
+        "extract_status": extract_status,
     }
-
-    # Extract (optional)
-    extract_status = "skipped"
-    if body.extract:
-        try:
-            extract_model = await model_resolver.resolve_model_for_purpose(
-                "extraction", extract_ref, series_id
-            )
-            extract_platform = await platform_repo.get_platform_by_id(extract_model["platform_id"])
-
-            extract_status = await extractor.extract_from_chapter(
-                translated_text=translated_text,
-                series_id=series_id,
-                model=extract_model,
-                platform=extract_platform,
-            )
-            chapter_updates["extract_status"] = extract_status
-            chapter_updates["extracted_by_model_id"] = extract_model["id"]
-            chapter_updates["extracted_by_model_name"] = extract_model["name"]
-            chapter_updates["extracted_at"] = now
-        except HTTPException:
-            # No extraction model configured — skip extraction silently
-            extract_status = "skipped"
-            chapter_updates["extract_status"] = "skipped"
-    else:
-        chapter_updates["extract_status"] = "skipped"
 
     await chapter_repo.update_chapter(chapter["id"], chapter_updates)
 
@@ -211,6 +273,7 @@ async def _handle_sync(
 
     return {
         "mode": "sync",
+        "strategy": body.strategy,
         "chapter_number": chapter_number,
         "status": "translated",
         "translated_text": translated_text,
@@ -219,3 +282,4 @@ async def _handle_sync(
         "translated_by_model_name": trans_model["name"],
         "source_language": chapter.get("source_language", "auto"),
     }
+

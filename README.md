@@ -129,15 +129,17 @@ All API endpoints are prefixed with `/api/v1`.
 | `translationModel.platform.apiType` | `String` | *Optional* | `"chat-completions"` | API protocol format (`"chat-completions"`, `"responses"`, `"messages"`). |
 | `translationModel.platform.model` | `Object` | *Optional* | `null` | **Single Model Object (1 Chapter 1 Model)**: `{"name": "gpt-4o", "url": "..."}`. |
 | `translationModel.platform.models` | `Array` | *Optional* | `null` | **Multiple Models Array**: `[{"name": "gpt-4o"}, {"name": "claude-3-5-sonnet"}]`. |
+| **`summarizeModel`** | `Object` \| `Integer` | *Optional* | `null` | **Summarize Model Reference** (Pipeline mode): Dedicated model for chapter summarization. Defaults to `translationModel` if omitted. |
 | **`extractionModel`** | `Object` \| `Integer` | *Optional* | `null` | Extraction Model Reference (same structure as `translationModel`). |
 | **`systemPrompt`** | `Object` \| `Integer` \| `String` | *Optional* | `null` | **System Prompt Reference**: Select existing prompt by ID `2`, by Name `"default"`, or create on-the-fly `{"name": "wuxia_tone", "promptText": "..."}`. |
 | `systemPrompt.id` | `Integer` | *Optional* | `null` | Existing System Prompt ID in database. |
 | `systemPrompt.name` | `String` | *Optional* | `null` | System Prompt name (e.g., `"default"`, `"formal"`, `"wuxia_tone"`). |
 | `systemPrompt.promptText` | `String` | *Optional* | `null` | Prompt text content. If `name` is new, creates a new prompt in DB; if `name` exists, updates prompt text. |
 | **`mode`** | `String` | *Optional* | `"sync"` | Execution mode: `"sync"` (blocking response) or `"async"` (job queue polling). |
+| **`strategy`** | `String` | *Optional* | `"pipeline"` | Execution strategy: `"pipeline"` (decoupled 2-3 LLM calls for Translate/Summarize/Extract) or `"single_pass"` (all-in-one single LLM call). |
 | **`forceTranslate`** | `Boolean` | *Optional* | `false` | Set `true` to force re-translating an already translated chapter. |
 | **`forceSummary`** | `Boolean` | *Optional* | `false` | Set `true` to force re-generating chapter plot summary. |
-| **`extract`** | `Boolean` | *Optional* | `true` | Set `true` to auto-extract newly introduced characters and glossary terms. |
+| **`extract`** | `Boolean` | *Optional* | `true` | Set `true` to auto-extract newly introduced characters and glossary terms (Pipeline mode). |
 
 #### Example Quickstart Request (New Series + HTML Chapter + New Platform/Model):
 ```bash
@@ -166,7 +168,7 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
              }
            },
            "mode": "sync",
-           "extract": true
+           "strategy": "pipeline"
          }'
 ```
 
@@ -197,6 +199,8 @@ curl -X POST "http://localhost:8000/api/v1/translate-novel" \
 - `GET /api/v1/platforms` - List platforms with their models.
 - `POST /api/v1/platforms/{platform_id}/models` - Add model under a platform.
 - `GET /api/v1/models` - List all registered models across platforms.
+
+> 💡 **Smart Base URL Normalization**: All LLM Adapters (`chat-completions`, `responses`, `messages`) feature automatic URL normalization. Model URLs can be specified as base domain (`https://aihubmix.com`), versioned path (`https://aihubmix.com/v1`), or full endpoint (`https://aihubmix.com/v1/chat/completions`). The backend automatically normalizes the URL to prevent double `/v1/v1` or duplicate endpoint path suffixes.
 
 ### 4. Series & Chapters
 - `POST /api/v1/series` - Create a novel series.

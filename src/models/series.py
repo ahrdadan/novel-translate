@@ -43,7 +43,7 @@ class SeriesResponse(BaseModel):
     translation_model_id: int | None = None
     extraction_model_id: int | None = None
     system_prompt_id: int | None = None
-    last_translated_chapter: int
+    last_translated_chapter: float
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -52,7 +52,7 @@ class SeriesStatusResponse(BaseModel):
     id: int
     name: str
     status: str
-    last_translated_chapter: int
+    last_translated_chapter: float
     total_chapters: int
     translated_chapters: int
     pending_chapters: int

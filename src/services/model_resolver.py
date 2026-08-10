@@ -193,7 +193,11 @@ async def resolve_model_for_purpose(
         if model:
             return model
 
-    # 4. Error
+    # 4. Fallback for summarization or extraction: Use Translation Model if dedicated model is not set
+    if purpose in ("summarization", "extraction"):
+        return await resolve_model_for_purpose("translation", request_model_ref, series_id)
+
+    # 5. Error
     raise HTTPException(
         400,
         f"No {purpose} model configured. Set a default in /settings, "

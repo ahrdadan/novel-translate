@@ -4,6 +4,8 @@ System prompt is resolved dynamically via DB or request/series overrides.
 Critical previous context instruction is always appended automatically.
 """
 
+from typing import Any
+
 from src.repositories import chapter_repo, glossary_repo
 from src.services import prompt_resolver
 from src.services.llm_adapters import get_adapter
@@ -35,16 +37,16 @@ async def translate_chapter(
     *,
     source_text: str,
     series_id: int,
-    chapter_number: int,
+    chapter_number: float,
     model: dict,
     platform: dict,
     system_prompt_ref: dict | None = None,
-) -> str:
-    """Translate a chapter using the resolved model, platform, and system prompt.
+    progress_callback: Any | None = None,
+    return_details: bool = False,
+) -> str | dict:
+    """Translate a chapter using resolved model, platform, and system prompt.
 
-    - Resolves system prompt (Custom DB prompt / request override / series override / default).
-    - Always appends the CRITICAL_INSTRUCTION for context separation.
-    - Appends glossary terms if available.
+    Supports chunking long text into paragraph batches and reporting real-time progress callbacks.
     """
     # 1. Resolve base system prompt
     prompt_obj = await prompt_resolver.resolve_system_prompt_for_series(
@@ -65,23 +67,58 @@ async def translate_chapter(
     prev_summary = await chapter_repo.get_previous_chapter_summary(series_id, chapter_number)
     context_prompt = _build_context_prompt(prev_summary)
 
+    # 5. Build user prompt with previous context and full chapter text (No Chunking)
     user_prompt = ""
     if context_prompt:
         user_prompt += context_prompt
     user_prompt += f"\n\nCURRENT TEXT TO TRANSLATE:\n{source_text}"
 
-    # 5. Call LLM via adapter
+    paragraphs = [p.strip() for p in source_text.split("\n\n") if p.strip()]
+    total_paragraphs = len(paragraphs) if paragraphs else 1
+
+    if progress_callback:
+        try:
+            await progress_callback({
+                "substage": "translating_full_chapter",
+                "total_paragraphs": total_paragraphs,
+                "message": f"Translating 1 full chapter ({total_paragraphs} paragraphs, {len(source_text)} chars)...",
+            })
+        except Exception:  # noqa: BLE001, S110
+            pass
+
     adapter = get_adapter(platform.get("api_type", "chat-completions"))
     base_url = model.get("url") or ""
     api_key = platform.get("api_key") or ""
 
-    return await adapter.call(
+    translated_text = await adapter.call(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         model_name=model["name"],
         base_url=base_url,
         api_key=api_key,
     )
+
+    if progress_callback:
+        try:
+            await progress_callback({
+                "substage": "translated_full_chapter_complete",
+                "total_paragraphs": total_paragraphs,
+                "message": f"Full chapter translation completed ({len(translated_text)} chars generated)",
+            })
+        except Exception:  # noqa: BLE001, S110
+            pass
+
+    clean_text = translated_text.strip()
+
+    if return_details:
+        return {
+            "translated_text": clean_text,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "raw_response": translated_text,
+        }
+
+    return clean_text
 
 
 def _build_glossary_prompt(terms: list[dict]) -> str:

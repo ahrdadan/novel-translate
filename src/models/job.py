@@ -9,13 +9,15 @@ from pydantic import BaseModel
 class JobResponse(BaseModel):
     id: int
     series_id: int
-    chapter_number: int
+    chapter_number: float
     status: str
     force_translate: bool = False
     force_summary: bool = False
     extract: bool = True
     result: dict[str, Any] | None = None
     error: str | None = None
+    queue_position: int | None = None
+    total_in_queue: int | None = None
     created_at: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None

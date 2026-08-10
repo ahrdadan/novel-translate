@@ -1,8 +1,11 @@
-"""OpenAI /v1/responses adapter."""
+import asyncio
+import logging
 
 import httpx
 
 from src.services.llm_adapters.base import BaseLLMAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class ResponsesAdapter(BaseLLMAdapter):
@@ -16,10 +19,17 @@ class ResponsesAdapter(BaseLLMAdapter):
         model_name: str,
         base_url: str,
         api_key: str,
-        max_tokens: int = 4096,
-        temperature: float = 0.3,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> str:
-        url = f"{base_url.rstrip('/')}/v1/responses"
+        base_clean = base_url.rstrip("/")
+        if base_clean.endswith(("/v1/responses", "/responses")):
+            url = base_clean
+
+        elif base_clean.endswith("/v1"):
+            url = f"{base_clean}/responses"
+        else:
+            url = f"{base_clean}/v1/responses"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -28,22 +38,39 @@ class ResponsesAdapter(BaseLLMAdapter):
             "model": model_name,
             "instructions": system_prompt,
             "input": user_prompt,
-            "max_output_tokens": max_tokens,
-            "temperature": temperature,
         }
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+        if max_tokens is not None:
+            payload["max_output_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
 
-        # Extract text from response output items
-        output_items = data.get("output", [])
-        for item in output_items:
-            if item.get("type") == "message":
-                for content in item.get("content", []):
-                    if content.get("type") == "output_text":
-                        return content["text"]
-        # Fallback: try direct output_text field
-        if "output_text" in data:
-            return data["output_text"]
-        raise ValueError(f"Could not extract text from responses API output: {data}")
+        max_retries = 2
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+
+                # Extract text from response output items
+                output_items = data.get("output", [])
+                for item in output_items:
+                    if item.get("type") == "message":
+                        for content in item.get("content", []):
+                            if content.get("type") == "output_text":
+                                return content["text"]
+                # Fallback: try direct output_text field
+                if "output_text" in data:
+                    return data["output_text"]
+                raise ValueError(f"Could not extract text from responses API output: {data}")
+            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                if attempt < max_retries and (status_code in (429, 500, 502, 503, 504) or isinstance(exc, httpx.RequestError)):
+                    sleep_time = attempt * 2
+                    logger.warning(
+                        "Responses API call attempt %d/%d failed (%s). Retrying in %ds...",
+                        attempt, max_retries, exc, sleep_time
+                    )
+                    await asyncio.sleep(sleep_time)
+                else:
+                    raise

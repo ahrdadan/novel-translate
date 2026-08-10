@@ -25,6 +25,7 @@ from src.routers.snapshots import router as snapshots_router
 from src.routers.system_prompts import router as system_prompts_router
 from src.routers.translate import router as translate_router
 from src.routers.unified_translate import router as unified_translate_router
+from src.routers.websocket import router as websocket_router
 from src.services.job_worker import resume_pending_jobs
 
 logging.basicConfig(
@@ -54,11 +55,63 @@ async def lifespan(app: FastAPI):
     logger.info("Database connection closed.")
 
 
+openapi_tags = [
+    {
+        "name": "⚡ Quickstart Translate",
+        "description": "All-in-One endpoint (POST /api/v1/translate-novel) to submit Series, Chapter, Platform, Model, and System Prompt in a single request.",
+    },
+    {
+        "name": "translate",
+        "description": "Chapter translation endpoints.",
+    },
+    {
+        "name": "series",
+        "description": "Series management.",
+    },
+    {
+        "name": "chapters",
+        "description": "Chapter management.",
+    },
+    {
+        "name": "glossary",
+        "description": "Glossary terms management.",
+    },
+    {
+        "name": "characters",
+        "description": "Character entities management.",
+    },
+    {
+        "name": "models",
+        "description": "Model management.",
+    },
+    {
+        "name": "platforms",
+        "description": "Platform management.",
+    },
+    {
+        "name": "system-prompts",
+        "description": "System prompt templates.",
+    },
+    {
+        "name": "jobs",
+        "description": "Async background job tracking.",
+    },
+    {
+        "name": "settings",
+        "description": "Global application settings.",
+    },
+    {
+        "name": "snapshots",
+        "description": "System backup and restore snapshots.",
+    },
+]
+
 app = FastAPI(
     title="Novel Translation API",
     description="AI-powered novel translation API with multi-platform LLM support, job queue, and glossary management.",
     version="1.0.0",
     lifespan=lifespan,
+    openapi_tags=openapi_tags,
 )
 
 # CORS — allow all origins for development
@@ -70,21 +123,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register all routers under /api/v1
+# Register all routers under /api/v1 (Quickstart All-in-One endpoint FIRST)
 API_PREFIX = "/api/v1"
 
-app.include_router(settings_router, prefix=API_PREFIX)
-app.include_router(platforms_router, prefix=API_PREFIX)
-app.include_router(models_router, prefix=API_PREFIX)
+app.include_router(unified_translate_router, prefix=API_PREFIX)
+app.include_router(translate_router, prefix=API_PREFIX)
 app.include_router(series_router, prefix=API_PREFIX)
 app.include_router(chapters_router, prefix=API_PREFIX)
 app.include_router(glossary_router, prefix=API_PREFIX)
 app.include_router(characters_router, prefix=API_PREFIX)
-app.include_router(translate_router, prefix=API_PREFIX)
-app.include_router(unified_translate_router, prefix=API_PREFIX)
-app.include_router(jobs_router, prefix=API_PREFIX)
+app.include_router(models_router, prefix=API_PREFIX)
+app.include_router(platforms_router, prefix=API_PREFIX)
 app.include_router(system_prompts_router, prefix=API_PREFIX)
+app.include_router(jobs_router, prefix=API_PREFIX)
+app.include_router(settings_router, prefix=API_PREFIX)
 app.include_router(snapshots_router, prefix=API_PREFIX)
+app.include_router(websocket_router, prefix=API_PREFIX)
+app.include_router(websocket_router)
 
 
 

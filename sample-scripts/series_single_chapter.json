@@ -1,0 +1,18 @@
+{
+  "series": {
+    "name": "Lee Ha-young (Single Chapter Demo)",
+    "originalTitle": "이하영",
+    "author": "Web Novel Author",
+    "description": "Single chapter HTML translation example",
+    "sourceLanguage": "Korean",
+    "targetLanguage": "Indonesian"
+  },
+  "chapter": {
+    "chapterNumber": 6,
+    "title": "Chapter 6: Lee Ha-young",
+    "file": "novel-html/response_chapter0006.html"
+  },
+  "translationModel": 1,
+  "mode": "async",
+  "strategy": "pipeline"
+}

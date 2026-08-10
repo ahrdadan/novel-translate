@@ -1,8 +1,11 @@
-"""OpenAI-compatible /v1/chat/completions adapter (default fallback)."""
+import asyncio
+import logging
 
 import httpx
 
 from src.services.llm_adapters.base import BaseLLMAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class ChatCompletionsAdapter(BaseLLMAdapter):
@@ -16,10 +19,17 @@ class ChatCompletionsAdapter(BaseLLMAdapter):
         model_name: str,
         base_url: str,
         api_key: str,
-        max_tokens: int = 65536,
-        temperature: float = 0.3,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> str:
-        url = f"{base_url.rstrip('/')}/v1/chat/completions"
+        base_clean = base_url.rstrip("/")
+        if base_clean.endswith(("/v1/chat/completions", "/chat/completions")):
+            url = base_clean
+
+        elif base_clean.endswith("/v1"):
+            url = f"{base_clean}/chat/completions"
+        else:
+            url = f"{base_clean}/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -30,11 +40,28 @@ class ChatCompletionsAdapter(BaseLLMAdapter):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
         }
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
+
+        max_retries = 2
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    return data["choices"][0]["message"]["content"]
+            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                if attempt < max_retries and (status_code in (429, 500, 502, 503, 504) or isinstance(exc, httpx.RequestError)):
+                    sleep_time = attempt * 2
+                    logger.warning(
+                        "ChatCompletions API call attempt %d/%d failed (%s). Retrying in %ds...",
+                        attempt, max_retries, exc, sleep_time
+                    )
+                    await asyncio.sleep(sleep_time)
+                else:
+                    raise
