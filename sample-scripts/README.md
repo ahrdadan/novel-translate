@@ -118,6 +118,10 @@ uv run python sample-scripts/main.py sample-scripts/series_new_platform.json
 
 # Menjalankan multi-chapter dengan Default Model ID:
 uv run python sample-scripts/main.py sample-scripts/series.json
+
+# Menjalankan script dengan server yang berbeda (Custom Endpoint URL):
+# Berguna jika backend berjalan di IP/Port berbeda atau di Cloud VPS.
+uv run python sample-scripts/main.py sample-scripts/series_new_platform.json --base-url http://192.168.1.100:9000
 ```
 
 **Output Terminal:**
