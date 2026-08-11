@@ -150,6 +150,17 @@ def process_config_file(api_client, config_path: str) -> bool:
             payload["extractionModel"] = config_data["extractionModel"]
         if "systemPrompt" in config_data:
             payload["systemPrompt"] = config_data["systemPrompt"]
+            
+        # Add force flags if they exist
+        if "forceTranslate" in config_data:
+            payload["forceTranslate"] = config_data["forceTranslate"]
+        elif "force_translate" in config_data:
+            payload["forceTranslate"] = config_data["force_translate"]
+            
+        if "forceSummary" in config_data:
+            payload["forceSummary"] = config_data["forceSummary"]
+        elif "force_summary" in config_data:
+            payload["forceSummary"] = config_data["force_summary"]
 
         print(f"  {CYAN}[{i}/{len(tasks)}] Submitting Chapter {task['chapterNumber']} ({hp.name})...{RESET}")
         try:

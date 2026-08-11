@@ -1,0 +1,27 @@
+{
+  "series": {
+    "name": "My Girlfriend Is Already Fully Trained",
+    "sourceLanguage": "Korean",
+    "targetLanguage": "Indonesian"
+  },
+  "chapter": {
+    "chapterNumber": 2,
+    "title": "Lee Ha-young (2)",
+    "file": "novel-html/response_chapter0007.html"
+  },
+  "translationModel": {
+    "platform": {
+      "name": "dahl",
+      "apiKey": "dahl_LCdEmX12knz2Ur7dRy5e8rgahHaC12zoJ",
+      "apiType": "chat-completions",
+      "models": [
+        {
+          "name": "moonshotai/Kimi-K2.6",
+          "url": "https://inference.dahl.global/v1"
+        }
+      ]
+    }
+  },
+  "mode": "async",
+  "strategy": "single_pass"
+}

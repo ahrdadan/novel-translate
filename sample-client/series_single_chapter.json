@@ -11,17 +11,18 @@
   },
   "translationModel": {
     "platform": {
-      "name": "tokenrouter",
-      "apiKey": "sk-UTb31l18hcaiUNXxY3JZFo2rHTtE4R0VGuqqt5q5ApaBzslv",
+      "name": "nvidia1",
+      "apiKey": "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",
       "apiType": "chat-completions",
       "models": [
         {
-          "name": "moonshotai/kimi-k3-free",
-          "url": "https://api.tokenrouter.com/v1"
+          "name": "openai/gpt-oss-120b",
+          "url": "https://integrate.api.nvidia.com/v1"
         }
       ]
     }
   },
   "mode": "async",
-  "strategy": "single_pass"
+  "strategy": "single_pass",
+  "forceTranslate": true
 }

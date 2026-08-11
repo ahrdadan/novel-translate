@@ -63,16 +63,17 @@ async def _progress_broadcaster() -> None:
                 continue
             for job_id in list(_active_job_tasks.keys()):
                 job = await job_repo.get_job_by_id(job_id)
-                if not job:
+                if not job or job.get("status") != "processing":
                     continue
                 elapsed = job.get("elapsed_seconds", 0)
-                await ws_manager.broadcast({
-                    "type": "job_progress",
-                    "job_id": job_id,
-                    "series_id": job.get("series_id"),
-                    "chapter_number": job.get("chapter_number"),
-                    "elapsed_seconds": elapsed,
-                })
+                if elapsed > 0:
+                    await ws_manager.broadcast({
+                        "type": "job_progress",
+                        "job_id": job_id,
+                        "series_id": job.get("series_id"),
+                        "chapter_number": job.get("chapter_number"),
+                        "elapsed_seconds": elapsed,
+                    })
         except Exception as e:  # noqa: BLE001
             logger.error("Progress broadcaster error: %s", e)
 
