@@ -14,6 +14,7 @@ def menu_view_settings(api_client) -> None:
                 status_text = f"{RED}PAUSED{RESET}" if is_paused else f"{GREEN}ACTIVE{RESET}"
                 
                 print(f"  Max Concurrent Jobs : {BOLD}{YELLOW}{settings.get('max_concurrent_jobs')}{RESET}")
+                print(f"  Only Diff Models    : {BOLD}{GREEN if settings.get('allow_concurrent_different_models') else RED}{settings.get('allow_concurrent_different_models')}{RESET}")
                 print(f"  System Status       : {BOLD}{status_text}")
                 print(f"  Default Trans Model : {settings.get('default_translation_model_id')}")
                 print(f"  Default Extr Model  : {settings.get('default_extraction_model_id')}")
@@ -22,6 +23,7 @@ def menu_view_settings(api_client) -> None:
                 
                 print(f"\n{BOLD}Pilihan Aksi:{RESET}")
                 print("  [C] Ubah Max Concurrent Jobs (Concurrency)")
+                print("  [D] Toggle Hanya Beda Model/Platform yang Boleh Bersamaan")
                 if is_paused:
                     print("  [R] Resume System (Unpause)")
                 else:
@@ -35,8 +37,8 @@ def menu_view_settings(api_client) -> None:
                     break
                     
                 if user_input == 'C':
-                    new_val = input("Masukkan jumlah max concurrent jobs baru [1-10]: ").strip()
-                    if new_val.isdigit() and 1 <= int(new_val) <= 10:
+                    new_val = input("Masukkan jumlah max concurrent jobs baru [1-100]: ").strip()
+                    if new_val.isdigit() and 1 <= int(new_val) <= 100:
                         patch_res = api_client.patch(f"{api_client.api_v1}/settings", json={"max_concurrent_jobs": int(new_val)})
                         if patch_res.status_code == 200:
                             print(f"{GREEN}✅ Berhasil mengubah Max Concurrent Jobs menjadi {new_val}{RESET}")
@@ -44,6 +46,14 @@ def menu_view_settings(api_client) -> None:
                             print(f"{RED}❌ Gagal mengubah: {patch_res.text}{RESET}")
                     else:
                         print(f"{RED}Input tidak valid.{RESET}")
+                        
+                elif user_input == 'D':
+                    current_val = settings.get("allow_concurrent_different_models", False)
+                    patch_res = api_client.patch(f"{api_client.api_v1}/settings", json={"allow_concurrent_different_models": not current_val})
+                    if patch_res.status_code == 200:
+                        print(f"{GREEN}✅ Status 'Only Diff Models' berhasil diubah.{RESET}")
+                    else:
+                        print(f"{RED}❌ Gagal mengubah: {patch_res.text}{RESET}")
                         
                 elif user_input == 'P' and not is_paused:
                     patch_res = api_client.patch(f"{api_client.api_v1}/settings", json={"is_paused": 1})

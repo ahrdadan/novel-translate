@@ -13,6 +13,7 @@ wheels/
 novel-*/
 
 data/
+sample-client/data/
 
 # Environment files
 .env

@@ -59,7 +59,7 @@ def menu_realtime_websocket_monitor(api_client):
                 print(f"[{timestamp}] │   ├── {BOLD}{YELLOW}[{stage.upper()}]{RESET} {msg}")
         elif msg_type == "job_progress":
             elapsed = data.get("elapsed_seconds", 0)
-            print(f"[{timestamp}] │   ├── {BOLD}{CYAN}⏱️ Waktu Berlalu (Elapsed): {elapsed} detik{RESET}")
+            print(f"[{timestamp}] │   ├── {BOLD}{CYAN}⏱️ [{s_name} - {c_title}] Waktu Berlalu: {elapsed} detik (Job #{data.get('job_id')}){RESET}")
         elif msg_type == "job_stream":
             chunk = data.get("chunk", "")
             print(f"{GREEN}{chunk}{RESET}", end="", flush=True)

@@ -22,18 +22,8 @@ logger = logging.getLogger(__name__)
 
 _worker_task: asyncio.Task | None = None
 _progress_task: asyncio.Task | None = None
-_semaphore: asyncio.Semaphore | None = None
 _active_model_ids: set[int] = set()
 _active_job_tasks: dict[int, asyncio.Task] = {}
-
-
-async def get_semaphore() -> asyncio.Semaphore:
-    global _semaphore
-    if _semaphore is None:
-        settings = await settings_repo.get_settings()
-        limit = settings.get("max_concurrent_jobs", 1)
-        _semaphore = asyncio.Semaphore(limit)
-    return _semaphore
 
 
 async def resume_pending_jobs() -> None:
@@ -79,8 +69,7 @@ async def _progress_broadcaster() -> None:
 
 
 async def _worker_loop() -> None:
-    """Continuously poll for queued jobs and execute them within semaphore limits."""
-    semaphore = await get_semaphore()
+    """Continuously poll for queued jobs and execute them within concurrency limits."""
     tick = 0
     while True:
         try:
@@ -100,7 +89,8 @@ async def _worker_loop() -> None:
                 await asyncio.sleep(5)
                 continue
 
-            if not semaphore.locked():
+            max_concurrent = settings.get("max_concurrent_jobs", 1)
+            if len(_active_job_tasks) < max_concurrent:
                 allow_diff = settings.get("allow_concurrent_different_models", False)
                 job_to_run = None
                 trans_model_id_to_track = None
@@ -129,7 +119,7 @@ async def _worker_loop() -> None:
                 if job_to_run:
                     if trans_model_id_to_track:
                         _active_model_ids.add(trans_model_id_to_track)
-                    task = asyncio.create_task(_execute_job_with_semaphore(job_to_run, semaphore, trans_model_id_to_track))
+                    task = asyncio.create_task(_execute_job_safe(job_to_run, trans_model_id_to_track))
                     _active_job_tasks[job_to_run["id"]] = task
                     task.add_done_callback(lambda t, jid=job_to_run["id"]: _active_job_tasks.pop(jid, None))
 
@@ -137,11 +127,6 @@ async def _worker_loop() -> None:
         except Exception as exc:  # noqa: BLE001
             logger.error("Worker loop error: %s", exc)
             await asyncio.sleep(5)
-
-
-async def _execute_job_with_semaphore(job: dict, semaphore: asyncio.Semaphore, tracked_model_id: int | None = None) -> None:
-    async with semaphore:
-        await _execute_job_safe(job, tracked_model_id)
 
 
 async def _execute_job_safe(job: dict, tracked_model_id: int | None = None) -> None:
