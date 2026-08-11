@@ -14,8 +14,8 @@ Usage:
 
 import argparse
 import io
-import sys
 import os
+import sys
 
 # Reconfigure stdout for UTF-8 on Windows terminal
 if sys.platform == "win32":

@@ -1,10 +1,12 @@
+import json
 import os
 import re
-import json
 import time
 from pathlib import Path
 from typing import Any
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET, print_json
+
+from ..utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW, print_json
+
 
 def extract_chapter_number(filename: str, fallback_idx: float = 1) -> float | int:
     match = re.search(r'(\d+(?:\.\d+)?)', filename)
@@ -26,7 +28,7 @@ def process_config_file(api_client, config_path: str) -> bool:
     try:
         with open(cfg_file, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"{RED}Error membaca JSON config: {e}{RESET}")
         return False
 
@@ -96,7 +98,7 @@ def process_config_file(api_client, config_path: str) -> bool:
                                             "title": c_title,
                                             "file_path": hp
                                         })
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"{YELLOW}Warning: Gagal membaca {toc_path.name}: {e}. Memakai scan folder biasa.{RESET}")
 
             if not tasks:
@@ -125,7 +127,7 @@ def process_config_file(api_client, config_path: str) -> bool:
         try:
             with open(hp, 'r', encoding='utf-8') as hf:
                 html_content = hf.read()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"  {RED}[{i}/{len(tasks)}] Gagal membaca {hp.name}: {e}{RESET}")
             continue
 
@@ -159,7 +161,7 @@ def process_config_file(api_client, config_path: str) -> bool:
                 success_count += 1
             else:
                 print(f"    {RED}- Failed [{res.status_code}]{RESET} | {res.text[:120]}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"    {RED}- Connection Error: {e}{RESET}")
 
     print(f"\n{BOLD}{CYAN}{'=' * 65}{RESET}")

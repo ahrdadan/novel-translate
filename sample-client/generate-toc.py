@@ -22,12 +22,12 @@ The script will read all HTML files in the target folder alphabetically,
 extract the text inside the first <h1> tag for the title, and generate 
 a 'toc.json' file inside that target directory.
 """
-import os
-import json
 import argparse
-import re
 import html
+import json
+import re
 from pathlib import Path
+
 
 def extract_title(file_path):
     """
@@ -44,7 +44,7 @@ def extract_title(file_path):
                 text = re.sub(r'<[^>]+>', '', inner_html)
                 # Unescape HTML entities (e.g. &amp; -> &)
                 return html.unescape(text).strip()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error reading {file_path}: {e}")
     return "Unknown Title"
 

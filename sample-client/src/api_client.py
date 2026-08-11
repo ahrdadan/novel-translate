@@ -1,5 +1,7 @@
+from typing import Any
+
 import httpx
-from typing import Any, Optional
+
 
 class APIClient:
     def __init__(self, base_url: str):
@@ -11,7 +13,7 @@ class APIClient:
         try:
             res = self.client.get(f"{self.base_url}/")
             return res.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False
 
     def fetch_models(self) -> list[dict[str, Any]]:
@@ -19,8 +21,8 @@ class APIClient:
             res = self.client.get(f"{self.api_v1}/models")
             if res.status_code == 200:
                 return res.json()
-        except Exception:
-            pass
+        except httpx.RequestError:
+            return []
         return []
 
     def fetch_series(self) -> list[dict[str, Any]]:
@@ -28,8 +30,8 @@ class APIClient:
             res = self.client.get(f"{self.api_v1}/series")
             if res.status_code == 200:
                 return res.json()
-        except Exception:
-            pass
+        except httpx.RequestError:
+            return []
         return []
 
     def fetch_jobs(self, series_id: int | None = None, status: str | None = None) -> list[dict[str, Any]]:
@@ -45,8 +47,8 @@ class APIClient:
             res = self.client.get(url)
             if res.status_code == 200:
                 return res.json()
-        except Exception:
-            pass
+        except httpx.RequestError:
+            return []
         return []
 
     def fetch_chapters(self, series_id: int) -> list[dict[str, Any]]:
@@ -54,8 +56,8 @@ class APIClient:
             res = self.client.get(f"{self.api_v1}/series/{series_id}/chapters")
             if res.status_code == 200:
                 return res.json()
-        except Exception:
-            pass
+        except httpx.RequestError:
+            return []
         return []
 
     def fetch_chapter_detail(self, series_id: int, chapter_number: float) -> dict[str, Any] | None:
@@ -63,8 +65,8 @@ class APIClient:
             res = self.client.get(f"{self.api_v1}/series/{series_id}/chapters/{chapter_number}")
             if res.status_code == 200:
                 return res.json()
-        except Exception:
-            pass
+        except httpx.RequestError:
+            return None
         return None
 
     def post(self, url: str, **kwargs) -> httpx.Response:

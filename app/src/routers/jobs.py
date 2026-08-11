@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from src.database import get_db
 from src.models.job import JobResponse
 from src.repositories import chapter_repo, job_repo
+from src.services import job_worker
 from src.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -66,6 +67,9 @@ async def cancel_job(job_id: int):
         raise HTTPException(404, f"Job {job_id} not found")
 
     cancelled_job = await job_repo.cancel_job(job_id)
+    
+    # Abort async task if running
+    job_worker.abort_running_job(job_id)
 
     # Reset corresponding chapter status to failed or pending
     chapter = await chapter_repo.get_chapter(job["series_id"], job["chapter_number"])

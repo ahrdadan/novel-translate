@@ -24,6 +24,7 @@ from fastapi import (
 from fastapi.responses import FileResponse
 
 from src.database import DATABASE_PATH, get_db
+from src.services import job_worker
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,11 @@ async def restore_snapshot(
 
             # Read table counts and restore online using SQLite backup API
             async with aiosqlite.connect(extracted_db) as temp_conn:
+                # CLEANUP: Remove stuck jobs from the snapshot so they don't resume after restore
+                await temp_conn.execute("DELETE FROM jobs WHERE status IN ('processing', 'queued')")
+                await temp_conn.execute("UPDATE chapters SET status = 'failed' WHERE status NOT IN ('completed', 'translated')")
+                await temp_conn.commit()
+
                 for table in TABLES_IN_ORDER:
                     try:
                         cursor = await temp_conn.execute(f"SELECT COUNT(*) FROM {table}")
@@ -193,6 +199,9 @@ async def restore_snapshot(
                         restored_counts[table] = row[0] if row else 0
                     except sqlite3.Error:
                         restored_counts[table] = 0
+
+                # Abort any running tasks in the current live instance
+                job_worker.abort_all_running_jobs()
 
                 # Perform safe online restore
                 await temp_conn.backup(db)
@@ -212,6 +221,9 @@ async def restore_snapshot(
             # Disable foreign keys during restore
             await db.execute("PRAGMA foreign_keys = OFF")
             try:
+                # Abort any running tasks in the current live instance
+                job_worker.abort_all_running_jobs()
+
                 # Truncate tables in reverse dependency order
                 for table in reversed(TABLES_IN_ORDER):
                     await db.execute(f"DELETE FROM {table}")
@@ -222,6 +234,17 @@ async def restore_snapshot(
                     if not rows:
                         restored_counts[table] = 0
                         continue
+
+                    # CLEANUP: Remove stuck jobs from snapshot data
+                    if table == "jobs":
+                        rows = [r for r in rows if r.get("status") not in ("processing", "queued")]
+                        if not rows:
+                            restored_counts[table] = 0
+                            continue
+                    elif table == "chapters":
+                        for row in rows:
+                            if row.get("status") not in ("completed", "translated"):
+                                row["status"] = "failed"
 
                     columns = list(rows[0].keys())
                     placeholders = ", ".join(["?"] * len(columns))

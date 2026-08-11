@@ -1,13 +1,15 @@
 import sys
+
 from .api_client import APIClient
-from .utils import print_banner, BOLD, CYAN, GREEN, RED, YELLOW, RESET
+from .menus.menu_backup import menu_database_backup
+from .menus.menu_chapters import menu_view_translated_chapters
 from .menus.menu_import import menu_import_config, menu_translate_novel_interactive
 from .menus.menu_info import menu_list_models, menu_list_series
 from .menus.menu_jobs import menu_check_jobs
-from .menus.menu_chapters import menu_view_translated_chapters
 from .menus.menu_realtime import menu_realtime_websocket_monitor
 from .menus.menu_settings import menu_view_settings
-from .menus.menu_backup import menu_database_backup
+from .utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW, print_banner
+
 
 class NovelTranslatorCLI:
     def __init__(self, base_url: str = "http://localhost:8000"):

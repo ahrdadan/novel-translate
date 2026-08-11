@@ -1,6 +1,8 @@
-import time
 import json
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET, MAGENTA
+import time
+
+from ..utils import BOLD, CYAN, GREEN, MAGENTA, RED, RESET, YELLOW
+
 
 def menu_realtime_websocket_monitor(api_client):
     print(f"\n{BOLD}{CYAN}[ 📡 7. Realtime Live WebSocket Monitor ]{RESET}")
@@ -10,6 +12,7 @@ def menu_realtime_websocket_monitor(api_client):
 
     try:
         import asyncio
+
         import websockets
     except ImportError:
         print(f"{RED}Error: Package 'websockets' belum terinstall. Install dengan `uv add websockets`.{RESET}")
@@ -82,9 +85,9 @@ def menu_realtime_websocket_monitor(api_client):
                             print(f"{BOLD}{CYAN}---------------------------------------{RESET}\n")
                         else:
                             render_ws_message(data)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         print(f"[{time.strftime('%H:%M:%S')}] {raw}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"\n{RED}Koneksi WebSocket terputus: {e}{RESET}")
 
     try:

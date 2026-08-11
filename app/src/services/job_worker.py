@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 _worker_task: asyncio.Task | None = None
 _semaphore: asyncio.Semaphore | None = None
 _active_model_ids: set[int] = set()
+_active_job_tasks: dict[int, asyncio.Task] = {}
 
 
 async def get_semaphore() -> asyncio.Semaphore:
@@ -94,7 +95,7 @@ async def _worker_loop() -> None:
                                     job_to_run = claimed
                                     trans_model_id_to_track = trans_model["id"]
                                 break
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001
                             logger.error("Failed resolving model for job %d during queue peek: %s", qj["id"], e)
                 else:
                     job_to_run = await job_repo.claim_next_queued()
@@ -102,7 +103,9 @@ async def _worker_loop() -> None:
                 if job_to_run:
                     if trans_model_id_to_track:
                         _active_model_ids.add(trans_model_id_to_track)
-                    asyncio.create_task(_execute_job_with_semaphore(job_to_run, semaphore, trans_model_id_to_track))
+                    task = asyncio.create_task(_execute_job_with_semaphore(job_to_run, semaphore, trans_model_id_to_track))
+                    _active_job_tasks[job_to_run["id"]] = task
+                    task.add_done_callback(lambda t, jid=job_to_run["id"]: _active_job_tasks.pop(jid, None))
 
             await asyncio.sleep(1)
         except Exception as exc:  # noqa: BLE001
@@ -134,12 +137,29 @@ async def _execute_job_safe(job: dict, tracked_model_id: int | None = None) -> N
             })
         except Exception as inner_exc:  # noqa: BLE001
             logger.error("Failed to update status for job %d: %s", job["id"], inner_exc)
-        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+        if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
             raise
     finally:
         if tracked_model_id and tracked_model_id in _active_model_ids:
             _active_model_ids.discard(tracked_model_id)
 
+
+def abort_running_job(job_id: int) -> bool:
+    """Abort a running job's asyncio task if it exists."""
+    task = _active_job_tasks.get(job_id)
+    if task and not task.done():
+        task.cancel()
+        return True
+    return False
+
+def abort_all_running_jobs() -> int:
+    """Abort all currently running job tasks."""
+    count = 0
+    for task in list(_active_job_tasks.values()):
+        if not task.done():
+            task.cancel()
+            count += 1
+    return count
 
 
 async def execute_job(job: dict) -> None:

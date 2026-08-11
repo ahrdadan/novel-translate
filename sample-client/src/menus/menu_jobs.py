@@ -1,4 +1,5 @@
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET
+from ..utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW
+
 
 def menu_check_jobs(api_client) -> None:
     print(f"\n{BOLD}{CYAN}[ 📊 5. Background Jobs Tracker ]{RESET}")
@@ -76,7 +77,7 @@ def menu_check_jobs(api_client) -> None:
                         print(f"{YELLOW}Buka Menu [7] Realtime Monitor untuk memantau pengerjaan.{RESET}\n")
                     else:
                         print(f"{RED}❌ Gagal retry Job #{retry_job_id} [{r_res.status_code}]: {r_res.text}{RESET}\n")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"{RED}Error koneksi: {e}{RESET}\n")
         elif user_act.upper() == "C":
             confirm = input(f"{BOLD}{YELLOW}Yakin ingin membatalkan semua job yang queued/processing? [y/N]: {RESET}").strip().lower()
@@ -92,7 +93,7 @@ def menu_check_jobs(api_client) -> None:
                             print(f"\n{YELLOW}Tidak ada job yang sedang berjalan/antre untuk dibatalkan.{RESET}\n")
                     else:
                         print(f"{RED}❌ Gagal membatalkan job: {c_res.text}{RESET}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"{RED}Error koneksi: {e}{RESET}\n")
     else:
         print(f"{YELLOW}Tidak ada background job yang cocok dengan filter ({status_filter or 'semua'}).{RESET}")

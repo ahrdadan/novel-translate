@@ -1,4 +1,5 @@
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET, print_json
+from ..utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW
+
 
 def menu_view_settings(api_client) -> None:
     while True:
@@ -59,6 +60,6 @@ def menu_view_settings(api_client) -> None:
             else:
                 print(f"{RED}Gagal mengambil settings: {res.text}{RESET}")
                 break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"{RED}Error: {e}{RESET}")
             break

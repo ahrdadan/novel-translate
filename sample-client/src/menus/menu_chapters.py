@@ -1,4 +1,5 @@
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET, MAGENTA
+from ..utils import BOLD, CYAN, GREEN, MAGENTA, RED, RESET, YELLOW
+
 
 def menu_view_translated_chapters(api_client) -> None:
     print(f"\n{BOLD}{CYAN}[ 📖 6. Lihat Chapter & Hasil Terjemahan ]{RESET}")
@@ -53,9 +54,40 @@ def menu_view_translated_chapters(api_client) -> None:
 
             print(f"  [{c_num}] {c_title} | Status: {status_color}{status}{RESET} | Model: {model_name}{queue_badge}{err_summary}")
 
-        chap_choice = input(f"\n{BOLD}Masukkan Nomor Chapter (Enter untuk kembali): {RESET}").strip()
+        print(f"\n{BOLD}Opsi Tambahan:{RESET}")
+        print(f"  {YELLOW}[R] Retry SEMUA Chapter yang Failed di Series ini{RESET}")
+        chap_choice = input(f"\n{BOLD}Masukkan Nomor Chapter / Opsi (Enter untuk kembali): {RESET}").strip()
         if not chap_choice:
             break
+
+        if chap_choice.upper() == "R":
+            failed_chaps = []
+            for c in chapters:
+                c_num = c.get("chapter_number")
+                status = c.get("status", "unknown")
+                job_info = job_by_chap.get(c_num)
+                if job_info and job_info.get("status") == "failed":
+                    status = "failed"
+                if status == "failed":
+                    failed_chaps.append(c_num)
+            
+            if not failed_chaps:
+                print(f"{YELLOW}Tidak ada chapter yang failed di series ini.{RESET}")
+            else:
+                print(f"\n{BOLD}{CYAN}Mengirim Request Retranslate untuk {len(failed_chaps)} chapter...{RESET}")
+                for c_num in failed_chaps:
+                    try:
+                        retry_res = api_client.post(
+                            f"{api_client.api_v1}/series/{series_id}/chapters/{c_num}/retranslate",
+                            json={"mode": "async", "forceTranslate": True}
+                        )
+                        if retry_res.status_code in (200, 201, 202):
+                            print(f"  {GREEN}✅ Ch #{c_num} di-retry!{RESET}")
+                        else:
+                            print(f"  {RED}❌ Ch #{c_num} gagal retry: {retry_res.text}{RESET}")
+                    except Exception as e:  # noqa: BLE001
+                        print(f"  {RED}Error koneksi pada Ch #{c_num}: {e}{RESET}")
+            continue
 
         try:
             val = float(chap_choice)
@@ -122,7 +154,7 @@ def _show_chapter_detail(api_client, series_id: int, chap_num: float, job_by_cha
                 print(f"{GREEN}✅ Berhasil mengirim request Retry! Job ID: #{job_id}{RESET}")
             else:
                 print(f"{RED}❌ Gagal Request Retry [{retry_res.status_code}]: {retry_res.text}{RESET}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"{RED}Error koneksi: {e}{RESET}")
         return
 

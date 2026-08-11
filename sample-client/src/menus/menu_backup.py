@@ -1,8 +1,9 @@
-import os
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET, MAGENTA
+
+from ..utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW
+
 
 def menu_database_backup(api_client) -> None:
     while True:
@@ -12,7 +13,7 @@ def menu_database_backup(api_client) -> None:
         backup_dir = Path("backup")
         backup_dir.mkdir(parents=True, exist_ok=True)
         
-        snapshots = sorted(list(backup_dir.glob("*.zip")), reverse=True)
+        snapshots = sorted(backup_dir.glob("*.zip"), reverse=True)
         
         print(f"\n{BOLD}Snapshots Tersedia:{RESET}")
         if not snapshots:
@@ -44,7 +45,7 @@ def menu_database_backup(api_client) -> None:
                     if match:
                         filename = match.group(1)
                     else:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
                         filename = f"snapshot_{timestamp}.zip"
                         
                     backup_path = backup_dir / filename
@@ -54,7 +55,7 @@ def menu_database_backup(api_client) -> None:
                     print(f"{BOLD}{GREEN}✅ Backup berhasil didownload dan disimpan ke: {backup_path}{RESET}")
                 else:
                     print(f"{BOLD}{RED}❌ Gagal membuat backup (Status {res.status_code}): {res.text}{RESET}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"{BOLD}{RED}❌ Error saat membuat backup: {e}{RESET}")
                 
         elif user_input == 'R':
@@ -72,7 +73,7 @@ def menu_database_backup(api_client) -> None:
             print(f"\n{BOLD}{RED}⚠️  PERINGATAN KRITIS ⚠️{RESET}")
             print(f"{YELLOW}Proses restore akan MENIMPA database utama di server backend saat ini!{RESET}")
             
-            confirm = input(f"Apakah Anda yakin ingin restore snapshot ini ke server? (ketik 'YA' untuk lanjut): ").strip()
+            confirm = input("Apakah Anda yakin ingin restore snapshot ini ke server? (ketik 'YA' untuk lanjut): ").strip()
             if confirm == "YA":
                 try:
                     print(f"\n{CYAN}Mengupload snapshot {selected_snap.name} ke server...{RESET}")
@@ -85,7 +86,7 @@ def menu_database_backup(api_client) -> None:
                         print(f"{BOLD}{GREEN}✅ Restore berhasil! Pesan server: {data.get('message', '')}{RESET}")
                     else:
                         print(f"{BOLD}{RED}❌ Gagal me-restore database (Status {res.status_code}): {res.text}{RESET}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"{BOLD}{RED}❌ Error saat me-restore database: {e}{RESET}")
             else:
                 print("Restore dibatalkan.")

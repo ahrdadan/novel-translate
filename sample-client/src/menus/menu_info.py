@@ -1,4 +1,5 @@
-from ..utils import BOLD, CYAN, GREEN, RED, YELLOW, RESET, MAGENTA, print_json
+from ..utils import BOLD, CYAN, MAGENTA, RED, RESET, YELLOW, print_json
+
 
 def menu_list_models(api_client) -> None:
     print(f"\n{BOLD}{CYAN}[ 🤖 3. Models & Platforms List ]{RESET}")
