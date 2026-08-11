@@ -22,23 +22,29 @@ logger = logging.getLogger(__name__)
 
 _worker_task: asyncio.Task | None = None
 _semaphore: asyncio.Semaphore | None = None
+_active_model_ids: set[int] = set()
 
 
 async def get_semaphore() -> asyncio.Semaphore:
     global _semaphore
     if _semaphore is None:
         settings = await settings_repo.get_settings()
-        limit = settings.get("max_concurrent_jobs", 3)
+        limit = settings.get("max_concurrent_jobs", 1)
         _semaphore = asyncio.Semaphore(limit)
     return _semaphore
 
 
 async def resume_pending_jobs() -> None:
-    """Startup handler: reset stuck 'processing' jobs and start the worker loop."""
-    stuck_jobs = await job_repo.get_jobs_by_status(["processing"])
+    """Startup handler: fail any old 'processing' or 'queued' jobs from previous run."""
+    stuck_jobs = await job_repo.get_jobs_by_status(["processing", "queued"])
     for job in stuck_jobs:
-        logger.info("Resetting stuck job %d from 'processing' to 'queued'", job["id"])
-        await job_repo.update_job_status(job["id"], "queued")
+        logger.info("Marking job %d as failed due to server restart", job["id"])
+        await job_repo.update_job_status(job["id"], "failed", error="Aborted due to server restart")
+        
+        # Reset corresponding chapter status back to pending
+        chapter = await chapter_repo.get_chapter(job["series_id"], job["chapter_number"])
+        if chapter and chapter.get("status") in ("processing", "queued", "pending"):
+            await chapter_repo.update_chapter(chapter["id"], {"status": "pending"})
 
     global _worker_task
     _worker_task = asyncio.create_task(_worker_loop())
@@ -55,7 +61,7 @@ async def _worker_loop() -> None:
             if tick % 60 == 0:
                 recovered = await job_repo.reset_stuck_jobs(timeout_minutes=15)
                 if recovered:
-                    logger.warning("Auto-recovered %d stuck processing jobs to 'queued'", len(recovered))
+                    logger.warning("Auto-failed %d stuck processing jobs (timeout)", len(recovered))
 
             if tick % 3600 == 0:
                 cleaned = await job_repo.cleanup_old_completed_jobs(days=7)
@@ -68,9 +74,35 @@ async def _worker_loop() -> None:
                 continue
 
             if not semaphore.locked():
-                job = await job_repo.claim_next_queued()
-                if job:
-                    asyncio.create_task(_execute_job_with_semaphore(job, semaphore))
+                allow_diff = settings.get("allow_concurrent_different_models", False)
+                job_to_run = None
+                trans_model_id_to_track = None
+
+                if allow_diff:
+                    queued_jobs = await job_repo.get_queued_jobs_ordered(limit=10)
+                    for qj in queued_jobs:
+                        try:
+                            # fast resolve model for this job to check its id
+                            trans_model = await model_resolver.resolve_model_for_purpose(
+                                "translation",
+                                qj.get("translation_model_ref"),
+                                qj["series_id"]
+                            )
+                            if trans_model["id"] not in _active_model_ids:
+                                claimed = await job_repo.claim_specific_job(qj["id"])
+                                if claimed:
+                                    job_to_run = claimed
+                                    trans_model_id_to_track = trans_model["id"]
+                                break
+                        except Exception as e:
+                            logger.error("Failed resolving model for job %d during queue peek: %s", qj["id"], e)
+                else:
+                    job_to_run = await job_repo.claim_next_queued()
+                
+                if job_to_run:
+                    if trans_model_id_to_track:
+                        _active_model_ids.add(trans_model_id_to_track)
+                    asyncio.create_task(_execute_job_with_semaphore(job_to_run, semaphore, trans_model_id_to_track))
 
             await asyncio.sleep(1)
         except Exception as exc:  # noqa: BLE001
@@ -78,12 +110,12 @@ async def _worker_loop() -> None:
             await asyncio.sleep(5)
 
 
-async def _execute_job_with_semaphore(job: dict, semaphore: asyncio.Semaphore) -> None:
+async def _execute_job_with_semaphore(job: dict, semaphore: asyncio.Semaphore, tracked_model_id: int | None = None) -> None:
     async with semaphore:
-        await _execute_job_safe(job)
+        await _execute_job_safe(job, tracked_model_id)
 
 
-async def _execute_job_safe(job: dict) -> None:
+async def _execute_job_safe(job: dict, tracked_model_id: int | None = None) -> None:
     """Wrapper to catch and log all errors from job execution."""
     try:
         await execute_job(job)
@@ -104,6 +136,9 @@ async def _execute_job_safe(job: dict) -> None:
             logger.error("Failed to update status for job %d: %s", job["id"], inner_exc)
         if isinstance(exc, (KeyboardInterrupt, SystemExit)):
             raise
+    finally:
+        if tracked_model_id and tracked_model_id in _active_model_ids:
+            _active_model_ids.discard(tracked_model_id)
 
 
 
@@ -397,7 +432,7 @@ async def execute_job(job: dict) -> None:
         try:
             ch = await chapter_repo.get_chapter(series_id, chapter_number)
             if ch:
-                await chapter_repo.update_chapter(ch["id"], {"status": "failed", "extract_status": "failed"})
+                await chapter_repo.update_chapter(ch["id"], {"status": "failed", "extract_status": "failed", "error": str(exc)})
         except Exception:  # noqa: BLE001, S110
             pass
 

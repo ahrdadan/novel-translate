@@ -12,9 +12,11 @@ wheels/
 # Novel folders
 novel-*/
 
-data/*
+data/
 
 # Environment files
 .env
 .env.*
 .ruff_cache/
+
+backup/

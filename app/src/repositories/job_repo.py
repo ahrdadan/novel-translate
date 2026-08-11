@@ -119,6 +119,43 @@ async def claim_next_queued() -> dict | None:
     return await get_job_by_id(job_id)
 
 
+async def get_queued_jobs_ordered(limit: int = 10) -> list[dict]:
+    """Get the next N queued jobs in order without claiming them."""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM jobs WHERE status = 'queued' ORDER BY id LIMIT ?",
+        (limit,)
+    )
+    rows = await cursor.fetchall()
+    jobs = []
+    for r in rows:
+        job = dict(r)
+        if job.get("translation_model_ref"):
+            job["translation_model_ref"] = json.loads(job["translation_model_ref"])
+        if job.get("extraction_model_ref"):
+            job["extraction_model_ref"] = json.loads(job["extraction_model_ref"])
+        job["force_translate"] = bool(job.get("force_translate", 0))
+        job["force_summary"] = bool(job.get("force_summary", 0))
+        job["extract"] = bool(job.get("extract", 1))
+        jobs.append(job)
+    return jobs
+
+
+async def claim_specific_job(job_id: int) -> dict | None:
+    """Atomically claim a specific queued job."""
+    db = await get_db()
+    now = datetime.now(UTC).isoformat()
+    res = await db.execute(
+        "UPDATE jobs SET status = 'processing', started_at = ? WHERE id = ? AND status = 'queued'",
+        (now, job_id),
+    )
+    await db.commit()
+    if res.rowcount == 0:
+        return None
+
+    return await get_job_by_id(job_id)
+
+
 async def reset_stuck_jobs(timeout_minutes: int = 15) -> list[dict]:
     """Find jobs stuck in 'processing' for longer than timeout_minutes and reset to 'queued'."""
     stuck_jobs = await get_jobs_by_status(["processing"])
@@ -142,7 +179,16 @@ async def reset_stuck_jobs(timeout_minutes: int = 15) -> list[dict]:
                 is_stuck = True
 
         if is_stuck:
-            await update_job_status(job["id"], "queued")
+            await update_job_status(job["id"], "failed", error="Job timeout (stuck in processing)")
+            
+            # Reset chapter status back to pending and clear error
+            chapter = await get_db() # We shouldn't import chapter_repo here due to circular dep, just execute raw sql
+            await chapter.execute(
+                "UPDATE chapters SET status = 'pending', error = NULL WHERE series_id = ? AND chapter_number = ? AND status = 'processing'",
+                (job["series_id"], job["chapter_number"])
+            )
+            await chapter.commit()
+            
             reset_jobs.append(job)
 
     return reset_jobs

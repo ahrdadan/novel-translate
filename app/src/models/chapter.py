@@ -28,6 +28,7 @@ class ChapterResponse(BaseModel):
     translated_text: str | None = None
     chapter_summary: str | None = None
     status: str
+    error: str | None = None
     extract_status: str
     translated_by_model_id: int | None = None
     translated_by_model_name: str | None = None
@@ -47,6 +48,7 @@ class ChapterListItem(BaseModel):
     chapter_number: float
     title: str | None = None
     status: str
+    error: str | None = None
     extract_status: str
     source_language: str | None = None
     translated_by_model_name: str | None = None

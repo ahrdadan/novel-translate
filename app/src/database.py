@@ -45,6 +45,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE settings ADD COLUMN default_system_prompt_id INTEGER REFERENCES system_prompts(id)")
     if settings_cols and "is_paused" not in settings_cols:
         await db.execute("ALTER TABLE settings ADD COLUMN is_paused INTEGER DEFAULT 0")
+    if settings_cols and "allow_concurrent_different_models" not in settings_cols:
+        await db.execute("ALTER TABLE settings ADD COLUMN allow_concurrent_different_models INTEGER DEFAULT 0")
 
     # Check series columns
     cursor = await db.execute("PRAGMA table_info(series)")
@@ -59,6 +61,14 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE jobs ADD COLUMN system_prompt_ref TEXT")
     if jobs_cols and "strategy" not in jobs_cols:
         await db.execute("ALTER TABLE jobs ADD COLUMN strategy TEXT DEFAULT 'pipeline'")
+    if jobs_cols and "extract" not in jobs_cols:
+        await db.execute("ALTER TABLE jobs ADD COLUMN extract INTEGER DEFAULT 1")
+
+    # Check chapters columns
+    cursor = await db.execute("PRAGMA table_info(chapters)")
+    chapters_cols = [r["name"] for r in await cursor.fetchall()]
+    if chapters_cols and "error" not in chapters_cols:
+        await db.execute("ALTER TABLE chapters ADD COLUMN error TEXT")
 
 
 
@@ -126,6 +136,7 @@ CREATE TABLE IF NOT EXISTS settings (
     default_extraction_model_id INTEGER REFERENCES models(id),
     default_system_prompt_id INTEGER REFERENCES system_prompts(id) DEFAULT 1,
     is_paused INTEGER DEFAULT 0,
+    allow_concurrent_different_models INTEGER DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -179,6 +190,7 @@ CREATE TABLE IF NOT EXISTS chapters (
     translated_text TEXT,
     chapter_summary TEXT,
     status TEXT DEFAULT 'pending',
+    error TEXT,
     extract_status TEXT DEFAULT 'pending',
     translated_by_model_id INTEGER REFERENCES models(id),
     translated_by_model_name TEXT,

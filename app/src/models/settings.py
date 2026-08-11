@@ -7,11 +7,12 @@ from pydantic import BaseModel
 
 class SettingsResponse(BaseModel):
     id: int = 1
-    max_concurrent_jobs: int
+    max_concurrent_jobs: int = 1
     default_translation_model_id: int | None = None
     default_extraction_model_id: int | None = None
     default_system_prompt_id: int | None = None
     is_paused: bool = False
+    allow_concurrent_different_models: bool = False
     updated_at: datetime | None = None
 
 
@@ -21,3 +22,4 @@ class SettingsUpdate(BaseModel):
     default_extraction_model_id: int | None = None
     default_system_prompt_id: int | None = None
     is_paused: bool | None = None
+    allow_concurrent_different_models: bool | None = None

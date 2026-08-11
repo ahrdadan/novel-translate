@@ -1,13 +1,13 @@
-# 📖 Novel Translation Client Runner & CLI (`sample-scripts/`)
+# 📖 Novel Translation Client Runner & CLI (`sample-client/`)
 
 Aplikasi client standalone untuk membaca file konfigurasi `.json`, folder HTML, serta metadata **`toc.json` (Table of Contents)** untuk mengirimkan chapter novel ke API **Novel Translation System**.
 
 ---
 
-## 📁 Struktur Folder `sample-scripts/`
+## 📁 Struktur Folder `sample-client/`
 
 ```text
-sample-scripts/
+sample-client/
 ├── main.py                     # Skrip utama CLI Runner & Batch TOC Parser
 ├── series.json                 # Config batch multi-chapter (Model ID Terdaftar)
 ├── series_new_platform.json    # Config batch multi-chapter (Platform & Model Baru Inline)
@@ -32,7 +32,7 @@ Jika Anda memiliki banyak file HTML dan tidak ingin membuat `toc.json` secara ma
 **Cara Penggunaan:**
 ```bash
 # Menjalankan dengan folder target novel-html dan mulai dari chapter 1
-python sample-scripts/generate-toc.py -d novel-html -s 1
+uv run python generate-toc.py -d novel-html -s 1
 ```
 
 - `-d` atau `--dir` : Menentukan nama atau path folder tempat file HTML berada (default: `novel-html`).
@@ -114,14 +114,14 @@ File `toc.json` diletakkan di dalam folder `novel-html/` untuk mendefinisikan no
 ### Perintah Terminal Direct Execution:
 ```bash
 # Menjalankan multi-chapter dari folder novel-html/ via toc.json dengan Platform & Model Baru Inline:
-uv run python sample-scripts/main.py sample-scripts/series_new_platform.json
+uv run python main.py series_new_platform.json
 
 # Menjalankan multi-chapter dengan Default Model ID:
-uv run python sample-scripts/main.py sample-scripts/series.json
+uv run python main.py series.json
 
 # Menjalankan script dengan server yang berbeda (Custom Endpoint URL):
 # Berguna jika backend berjalan di IP/Port berbeda atau di Cloud VPS.
-uv run python sample-scripts/main.py sample-scripts/series_new_platform.json --base-url http://192.168.1.100:9000
+uv run python main.py series_new_platform.json --base-url http://192.168.1.100:9000
 ```
 
 **Output Terminal:**
@@ -131,7 +131,7 @@ uv run python sample-scripts/main.py sample-scripts/series_new_platform.json --b
 =================================================================
  Connected Server Base URL: http://localhost:8000
 
-📂 Membaca Konfigurasi dari: sample-scripts/series_new_platform.json
+📂 Membaca Konfigurasi dari: series_new_platform.json
 [OK] Membaca TOC Metadata dari: toc.json
 [OK] Ditemukan 5 chapter HTML untuk diproses.
 

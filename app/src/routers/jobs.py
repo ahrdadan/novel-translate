@@ -96,6 +96,34 @@ async def reset_stuck_jobs(timeout_minutes: int = 15):
     }
 
 
+@router.post("/cancel-all")
+async def cancel_all_jobs():
+    """Cancel all queued and processing jobs at once."""
+    jobs_to_cancel = await job_repo.get_jobs_by_status(["queued", "processing"])
+    
+    cancelled_count = 0
+    for job in jobs_to_cancel:
+        # Update job to failed
+        await job_repo.cancel_job(job["id"])
+        
+        # Abort async task
+        job_worker.abort_running_job(job["id"])
+        
+        # Reset chapter status
+        chapter = await chapter_repo.get_chapter(job["series_id"], job["chapter_number"])
+        if chapter and chapter.get("status") in ("processing", "queued", "pending"):
+            await chapter_repo.update_chapter(chapter["id"], {"status": "pending", "error": None})
+            
+        cancelled_count += 1
+        
+    await ws_manager.broadcast({
+        "type": "jobs_cancelled",
+        "message": f"🚫 Dibatalkan {cancelled_count} job secara massal oleh pengguna.",
+    })
+    
+    return {"status": "ok", "cancelled_count": cancelled_count}
+
+
 @router.delete("/cleanup")
 async def cleanup_jobs(status: str = "completed"):
     """Manually delete jobs by status (e.g. 'completed' or 'completed,failed')."""

@@ -9,7 +9,7 @@ async def get_settings() -> dict:
     db = await get_db()
     cursor = await db.execute("SELECT * FROM settings WHERE id = 1")
     row = await cursor.fetchone()
-    return dict(row) if row else {"id": 1, "max_concurrent_jobs": 3}
+    return dict(row) if row else {"id": 1, "max_concurrent_jobs": 1}
 
 
 async def update_settings(updates: dict) -> dict:
