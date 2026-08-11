@@ -10,8 +10,8 @@
   "translationModel": [
     {
       "platform": {
-        "name": "tokenrouter",
-        "apiKey": "sk-your-api-key",
+        "name": "tokenrouter1",
+        "apiKey": "sk-dx5DDM7arUvLegPWbFrmqOH41N6NkiTAseFpxqUPrjNdG3cj",
         "apiType": "chat-completions",
         "models": [
           {
@@ -23,13 +23,39 @@
     },
     {
       "platform": {
-        "name": "openrouter",
-        "apiKey": "sk-or-your-api-key",
+        "name": "tokenrouter2",
+        "apiKey": "sk-2Yzp4Txd8XOMV35OlqFajmiZKHVAhv8rFUUQfnSC6HTuv46h",
         "apiType": "chat-completions",
         "models": [
           {
-            "name": "meta-llama/llama-3.1-70b-instruct",
-            "url": "https://openrouter.ai/api/v1"
+            "name": "moonshotai/kimi-k3-free",
+            "url": "https://api.tokenrouter.com/v1"
+          }
+        ]
+      }
+    },
+    {
+      "platform": {
+        "name": "tokenrouter3",
+        "apiKey": "sk-y1QSlHBq7udm4uwzmVQdBoUXJnGYhH8F2W2B1lTThpc4mGNX",
+        "apiType": "chat-completions",
+        "models": [
+          {
+            "name": "moonshotai/kimi-k3-free",
+            "url": "https://api.tokenrouter.com/v1"
+          }
+        ]
+      }
+    },
+    {
+      "platform": {
+        "name": "tokenrouter4",
+        "apiKey": "sk-X8ThFH9lIjpm0aUNz5JCnj0SFEJR38v7smbPyvBxGPfUDVjT",
+        "apiType": "chat-completions",
+        "models": [
+          {
+            "name": "moonshotai/kimi-k3-free",
+            "url": "https://api.tokenrouter.com/v1"
           }
         ]
       }

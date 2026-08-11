@@ -167,8 +167,13 @@ def process_config_file(api_client, config_path: str) -> bool:
             res = api_client.post(f"{api_client.api_v1}/translate-novel", json=payload)
             if res.status_code in (200, 201, 202):
                 res_data = res.json()
-                job_id = res_data.get("job_id") or res_data.get("chapter", {}).get("id")
-                print(f"    {GREEN}+ Success [{res.status_code}]{RESET} | Job ID: {job_id} | Status: {res_data.get('status')}")
+                if "results" in res_data:
+                    accepted = res_data.get("accepted_count", 0)
+                    skipped = res_data.get("skipped_count", 0)
+                    print(f"    {GREEN}+ Success [{res.status_code}]{RESET} | Queued {accepted} models (Skipped {skipped})")
+                else:
+                    job_id = res_data.get("job_id") or res_data.get("chapter", {}).get("id")
+                    print(f"    {GREEN}+ Success [{res.status_code}]{RESET} | Job ID: {job_id} | Status: {res_data.get('status')}")
                 success_count += 1
             else:
                 print(f"    {RED}- Failed [{res.status_code}]{RESET} | {res.text[:120]}")
