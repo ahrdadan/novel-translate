@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 _worker_task: asyncio.Task | None = None
+_progress_task: asyncio.Task | None = None
 _semaphore: asyncio.Semaphore | None = None
 _active_model_ids: set[int] = set()
 _active_job_tasks: dict[int, asyncio.Task] = {}
@@ -47,9 +48,33 @@ async def resume_pending_jobs() -> None:
         if chapter and chapter.get("status") in ("processing", "queued", "pending"):
             await chapter_repo.update_chapter(chapter["id"], {"status": "pending"})
 
-    global _worker_task
+    global _worker_task, _progress_task
     _worker_task = asyncio.create_task(_worker_loop())
+    _progress_task = asyncio.create_task(_progress_broadcaster())
     logger.info("Job worker loop started")
+
+
+async def _progress_broadcaster() -> None:
+    """Periodically broadcast WS events with elapsed times for active jobs."""
+    while True:
+        try:
+            await asyncio.sleep(10)
+            if not _active_job_tasks:
+                continue
+            for job_id in list(_active_job_tasks.keys()):
+                job = await job_repo.get_job_by_id(job_id)
+                if not job:
+                    continue
+                elapsed = job.get("elapsed_seconds", 0)
+                await ws_manager.broadcast({
+                    "type": "job_progress",
+                    "job_id": job_id,
+                    "series_id": job.get("series_id"),
+                    "chapter_number": job.get("chapter_number"),
+                    "elapsed_seconds": elapsed,
+                })
+        except Exception as e:  # noqa: BLE001
+            logger.error("Progress broadcaster error: %s", e)
 
 
 async def _worker_loop() -> None:
@@ -123,17 +148,20 @@ async def _execute_job_safe(job: dict, tracked_model_id: int | None = None) -> N
     try:
         await execute_job(job)
     except BaseException as exc:
-        logger.error("Unhandled error in job %d: %s", job["id"], exc)
+        error_msg = str(exc) or repr(exc)
+        logger.error("Unhandled error in job %d: %s", job["id"], error_msg)
         try:
-            await job_repo.update_job_status(job["id"], "failed", error=str(exc))
+            await job_repo.update_job_status(job["id"], "failed", error=error_msg)
             await ws_manager.broadcast({
                 "type": "job_failed",
                 "job_id": job["id"],
                 "series_id": job.get("series_id"),
+                "series_name": job.get("series_name", f"Series #{job.get('series_id')}"),
                 "chapter_number": job.get("chapter_number"),
+                "chapter_title": job.get("chapter_title", f"Chapter #{job.get('chapter_number')}"),
                 "status": "failed",
-                "error": str(exc),
-                "message": f"Job #{job['id']} failed: {exc}",
+                "error": error_msg,
+                "message": f"Job #{job['id']} failed: {error_msg}",
             })
         except Exception as inner_exc:  # noqa: BLE001
             logger.error("Failed to update status for job %d: %s", job["id"], inner_exc)
@@ -168,36 +196,26 @@ async def execute_job(job: dict) -> None:
     series_id = job["series_id"]
     chapter_number = job["chapter_number"]
 
+    series_name = job.get("series_name", f"Series #{series_id}")
+    chapter_title = job.get("chapter_title", f"Chapter #{chapter_number}")
+
     await ws_manager.broadcast({
         "type": "job_started",
         "job_id": job_id,
         "series_id": series_id,
+        "series_name": series_name,
         "chapter_number": chapter_number,
+        "chapter_title": chapter_title,
         "stage": "starting",
-        "message": f"🚀 Job #{job_id} started processing (Chapter #{chapter_number})...",
+        "message": f"🚀 Job #{job_id} started processing for '{series_name}' — Chapter #{chapter_number}: '{chapter_title}'",
     })
 
     try:
-        # Get series and chapter info for rich progress messaging
+        # Get series and chapter info for rich progress messaging (still fetch to ensure it exists, though we have name/title)
         series = await series_repo.get_series_by_id(series_id)
-        series_name = series.get("name") if series else f"Series #{series_id}"
-
         chapter = await chapter_repo.get_chapter(series_id, chapter_number)
         if not chapter:
             raise ValueError(f"Chapter {chapter_number} not found in series {series_id}")
-
-        chapter_title = chapter.get("title") or f"Chapter {chapter_number}"
-
-        await ws_manager.broadcast({
-            "type": "job_started",
-            "job_id": job_id,
-            "series_id": series_id,
-            "series_name": series_name,
-            "chapter_number": chapter_number,
-            "chapter_title": chapter_title,
-            "stage": "starting",
-            "message": f"🚀 Job #{job_id} started processing for '{series_name}' — Chapter #{chapter_number}: '{chapter_title}'",
-        })
 
         # Set chapter status to processing
         await chapter_repo.update_chapter(chapter["id"], {"status": "processing"})
@@ -256,6 +274,15 @@ async def execute_job(job: dict) -> None:
                 "stage": "translating_single_pass",
                 "message": f"✍️ Single-pass translating Chapter #{chapter_number} using '{trans_model['name']}'...",
             })
+            async def _stream_cb(chunk: str):
+                await ws_manager.broadcast({
+                    "type": "job_stream",
+                    "job_id": job_id,
+                    "series_id": series_id,
+                    "chapter_number": chapter_number,
+                    "chunk": chunk,
+                })
+
             res = await single_pass.translate_chapter_single_pass(
                 source_text=chapter["source_text"],
                 series_id=series_id,
@@ -263,6 +290,7 @@ async def execute_job(job: dict) -> None:
                 model=trans_model,
                 platform=trans_platform,
                 system_prompt_ref=job.get("system_prompt_ref"),
+                stream_callback=_stream_cb,
             )
             translated_text = res["translated_text"]
             chapter_summary = res["chapter_summary"]
@@ -438,10 +466,11 @@ async def execute_job(job: dict) -> None:
         })
 
     except Exception as exc:  # noqa: BLE001
-        logger.error("Job %d failed: %s", job_id, exc)
-        await job_repo.update_job_status(job_id, "failed", error=str(exc))
+        error_msg = str(exc) or repr(exc)
+        logger.error("Job %d failed: %s", job_id, error_msg)
+        await job_repo.update_job_status(job_id, "failed", error=error_msg)
         
-        error_str = str(exc).lower()
+        error_str = error_msg.lower()
         if any(keyword in error_str for keyword in ["429", "401", "403", "insufficient_quota", "rate limit"]):
             logger.critical("API Quota/Auth Error detected. Auto-pausing global queue.")
             await settings_repo.update_settings({"is_paused": 1})
@@ -452,7 +481,7 @@ async def execute_job(job: dict) -> None:
         try:
             ch = await chapter_repo.get_chapter(series_id, chapter_number)
             if ch:
-                await chapter_repo.update_chapter(ch["id"], {"status": "failed", "extract_status": "failed", "error": str(exc)})
+                await chapter_repo.update_chapter(ch["id"], {"status": "failed", "extract_status": "failed", "error": error_msg})
         except Exception:  # noqa: BLE001, S110
             pass
 
@@ -464,7 +493,7 @@ async def execute_job(job: dict) -> None:
             "chapter_number": chapter_number,
             "chapter_title": chapter_title if 'chapter_title' in locals() else f"Chapter #{chapter_number}",
             "status": "failed",
-            "error": str(exc),
-            "message": f"❌ Job #{job_id} (Chapter #{chapter_number}) failed: {exc}",
+            "error": error_msg,
+            "message": f"❌ Job #{job_id} (Chapter #{chapter_number}) failed: {error_msg}",
         })
 

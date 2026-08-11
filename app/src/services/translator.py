@@ -42,11 +42,14 @@ async def translate_chapter(
     platform: dict,
     system_prompt_ref: dict | None = None,
     progress_callback: Any | None = None,
+    stream_callback=None,
     return_details: bool = False,
 ) -> str | dict:
-    """Translate a chapter using resolved model, platform, and system prompt.
+    """Translate a full chapter in one shot (No Chunking).
 
-    Supports chunking long text into paragraph batches and reporting real-time progress callbacks.
+    - Fetches series glossary and previous chapter summary for context.
+    - Resolves the system prompt (from ref or default).
+    - Instructs the LLM to preserve markdown formatting.
     """
     # 1. Resolve base system prompt
     prompt_obj = await prompt_resolver.resolve_system_prompt_for_series(
@@ -90,13 +93,26 @@ async def translate_chapter(
     base_url = model.get("url") or ""
     api_key = platform.get("api_key") or ""
 
-    translated_text = await adapter.call(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        model_name=model["name"],
-        base_url=base_url,
-        api_key=api_key,
-    )
+    if stream_callback:
+        chunks = []
+        async for chunk in adapter.call_stream(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_name=model["name"],
+            base_url=base_url,
+            api_key=api_key,
+        ):
+            chunks.append(chunk)
+            await stream_callback(chunk)
+        translated_text = "".join(chunks)
+    else:
+        translated_text = await adapter.call(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_name=model["name"],
+            base_url=base_url,
+            api_key=api_key,
+        )
 
     if progress_callback:
         try:

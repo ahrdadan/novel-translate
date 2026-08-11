@@ -57,6 +57,14 @@ def menu_realtime_websocket_monitor(api_client):
                 print(f"[{timestamp}] │   ├── {BOLD}{GREEN}✅ Ekstraksi Entitas Selesai!{RESET}")
             else:
                 print(f"[{timestamp}] │   ├── {BOLD}{YELLOW}[{stage.upper()}]{RESET} {msg}")
+        elif msg_type == "job_progress":
+            elapsed = data.get("elapsed_seconds", 0)
+            print(f"[{timestamp}] │   ├── {BOLD}{CYAN}⏱️ Waktu Berlalu (Elapsed): {elapsed} detik{RESET}")
+        elif msg_type == "job_stream":
+            chunk = data.get("chunk", "")
+            print(f"{GREEN}{chunk}{RESET}", end="", flush=True)
+            # We return early so we don't print anything else for stream chunks
+            return
         elif msg_type == "job_completed":
             print(f"[{timestamp}] └── {BOLD}{GREEN}🎉 Series '{s_name}' | {c_title} Selesai Sepenuhnya! (Job #{data.get('job_id')}){RESET}\n")
         elif msg_type == "job_failed":
@@ -65,8 +73,12 @@ def menu_realtime_websocket_monitor(api_client):
                 print(f"         {RED}Penyebab Error: {data.get('error')}{RESET}\n")
         elif msg_type == "connection_established":
             print(f"[{timestamp}] {BOLD}{GREEN}🟢 [STATUS SISTEM]{RESET} {msg}")
-            if data.get("jobs"):
-                print(f"         Total Job Belum Selesai (Queued/Processing/Failed): {len(data['jobs'])}")
+            if "jobs" in data:
+                jobs_list = data["jobs"]
+                q_count = len([j for j in jobs_list if j.get("status") == "queued"])
+                p_count = len([j for j in jobs_list if j.get("status") == "processing"])
+                f_count = len([j for j in jobs_list if j.get("status") == "failed"])
+                print(f"         Total Job: {len(jobs_list)} ( {YELLOW}Queued: {q_count}{RESET} | {CYAN}Processing: {p_count}{RESET} | {RED}Failed: {f_count}{RESET} )")
         else:
             print(f"[{timestamp}] │   ├── {BOLD}{MAGENTA}[{msg_type.upper()}]{RESET} {msg}")
 

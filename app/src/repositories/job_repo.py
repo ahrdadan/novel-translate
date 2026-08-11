@@ -30,7 +30,14 @@ async def create_job(data: dict) -> dict:
 
 async def get_job_by_id(job_id: int) -> dict | None:
     db = await get_db()
-    cursor = await db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+    cursor = await db.execute(
+        """SELECT j.*, s.name as series_name, c.title as chapter_title 
+           FROM jobs j
+           LEFT JOIN series s ON j.series_id = s.id
+           LEFT JOIN chapters c ON j.series_id = c.series_id AND j.chapter_number = c.chapter_number
+           WHERE j.id = ?""",
+        (job_id,)
+    )
     row = await cursor.fetchone()
     if not row:
         return None
@@ -51,6 +58,13 @@ async def get_job_by_id(job_id: int) -> dict | None:
         q_info = await get_job_queue_info(job_id)
         job["queue_position"] = q_info["queue_position"]
         job["total_in_queue"] = q_info["total_in_queue"]
+
+    if job["status"] == "processing" and job.get("started_at"):
+        try:
+            started = datetime.fromisoformat(job["started_at"])
+            job["elapsed_seconds"] = int((datetime.now(UTC) - started).total_seconds())
+        except Exception:  # noqa: BLE001, S110
+            pass
 
     return job
 
@@ -250,23 +264,29 @@ async def list_jobs(
     limit: int = 50,
 ) -> list[dict]:
     db = await get_db()
-    query = "SELECT * FROM jobs WHERE 1=1"
+    query = """
+        SELECT j.*, s.name as series_name, c.title as chapter_title 
+        FROM jobs j
+        LEFT JOIN series s ON j.series_id = s.id
+        LEFT JOIN chapters c ON j.series_id = c.series_id AND j.chapter_number = c.chapter_number
+        WHERE 1=1
+    """
     params = []
     if series_id is not None:
-        query += " AND series_id = ?"
+        query += " AND j.series_id = ?"
         params.append(series_id)
     if status is not None:
         status_list = [s.strip().lower() for s in status.split(",") if s.strip()]
         # Alias 'pending' -> 'queued' for user convenience
         status_list = ["queued" if s == "pending" else s for s in status_list]
         if len(status_list) == 1:
-            query += " AND status = ?"
+            query += " AND j.status = ?"
             params.append(status_list[0])
         elif len(status_list) > 1:
             placeholders = ", ".join(["?"] * len(status_list))
-            query += f" AND status IN ({placeholders})"
+            query += f" AND j.status IN ({placeholders})"
             params.extend(status_list)
-    query += " ORDER BY id DESC LIMIT ?"
+    query += " ORDER BY j.id DESC LIMIT ?"
     params.append(limit)
     cursor = await db.execute(query, params)
     rows = await cursor.fetchall()
@@ -283,6 +303,13 @@ async def list_jobs(
             q_info = await get_job_queue_info(job["id"])
             job["queue_position"] = q_info["queue_position"]
             job["total_in_queue"] = q_info["total_in_queue"]
+
+        if job["status"] == "processing" and job.get("started_at"):
+            try:
+                started = datetime.fromisoformat(job["started_at"])
+                job["elapsed_seconds"] = int((datetime.now(UTC) - started).total_seconds())
+            except Exception:  # noqa: BLE001, S110
+                pass
 
         jobs.append(job)
     return jobs

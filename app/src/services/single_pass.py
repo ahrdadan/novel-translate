@@ -50,6 +50,7 @@ async def translate_chapter_single_pass(
     model: dict,
     platform: dict,
     system_prompt_ref: dict | None = None,
+    stream_callback=None,
 ) -> dict:
     """Execute translation, summarization, and extraction in a single LLM call.
 
@@ -88,13 +89,26 @@ async def translate_chapter_single_pass(
     base_url = model.get("url") or ""
     api_key = platform.get("api_key") or ""
 
-    response_text = await adapter.call(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        model_name=model["name"],
-        base_url=base_url,
-        api_key=api_key,
-    )
+    if stream_callback:
+        chunks = []
+        async for chunk in adapter.call_stream(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_name=model["name"],
+            base_url=base_url,
+            api_key=api_key,
+        ):
+            chunks.append(chunk)
+            await stream_callback(chunk)
+        response_text = "".join(chunks)
+    else:
+        response_text = await adapter.call(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_name=model["name"],
+            base_url=base_url,
+            api_key=api_key,
+        )
 
     # 5. Parse JSON output with robust regex extraction & fuzzy anti-typo parsing
     json_str = _clean_json_string(response_text)

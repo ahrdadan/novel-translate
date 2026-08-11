@@ -49,8 +49,12 @@ def menu_view_translated_chapters(api_client) -> None:
             err_summary = ""
             if status == "failed":
                 err_text = c.get("error") or (job_info and job_info.get("error"))
-                if err_text:
-                    err_summary = f" {RED}(Error: {str(err_text)[:45]}...){RESET}"
+                err_str = (str(err_text) if err_text else "").strip()
+                if not err_str:
+                    err_str = "Unknown"
+                elif len(err_str) > 45:
+                    err_str = err_str[:45] + "..."
+                err_summary = f" {RED}(Error: {err_str}){RESET}"
 
             print(f"  [{c_num}] {c_title} | Status: {status_color}{status}{RESET} | Model: {model_name}{queue_badge}{err_summary}")
 

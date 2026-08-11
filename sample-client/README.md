@@ -150,3 +150,14 @@ uv run python main.py series_new_platform.json --base-url http://192.168.1.100:9
 HASIL BATCH IMPORT: 5/5 Chapter Berhasil Dikirim.
 =================================================================
 ```
+
+### Interactive Menu CLI:
+Anda juga dapat menjalankan menu interaktif CLI dengan menjalankan `main.py` tanpa argumen, yang memberikan akses ke berbagai fitur:
+```bash
+uv run python main.py
+```
+
+**Fitur Interaktif (Menus):**
+- `[ 🤖 3. Platforms & Models List ]`: Menampilkan platform beserta modelnya. Dilengkapi dengan **Fitur PING** (`[P]`) untuk mengecek validitas API Key dan kapabilitas real-time streaming model secara langsung.
+- `[ 📊 5. Background Jobs Tracker ]`: Menampilkan daftar job beserta waktu yang sudah berjalan (`elapsed time`) secara real-time.
+- `[ 📡 7. Realtime Live WebSocket Monitor ]`: Layar live monitoring untuk melihat progress translasi per-chunk (streaming text) dan stage-stage lainnya (summarizing, extracting) via WebSocket.

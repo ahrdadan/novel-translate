@@ -37,7 +37,11 @@ class ConnectionManager:
         logger.info("WebSocket client disconnected. Active connections: %d", len(self.active_connections))
 
     async def broadcast(self, message: dict[str, Any]) -> None:
-        if isinstance(message, dict) and message.get("type") in ("stage_update", "job_queued", "job_started", "job_finished", "job_failed"):
+        import time
+        if "timestamp" not in message:
+            message["timestamp"] = time.strftime("%H:%M:%S")
+
+        if isinstance(message, dict) and message.get("type") in ("stage_update", "job_queued", "job_started", "job_completed", "job_failed"):
             self.event_history.append(message)
             job_id = message.get("job_id")
             if job_id and job_id not in self.job_ids_in_history:

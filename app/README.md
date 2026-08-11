@@ -16,10 +16,15 @@ Version: **1.0.0**
   - Request-level inline platform/model definition with create-or-append logic
   - Series-level model override
   - Global default settings override
+- **Advanced Model Diagnostics & Real-Time Streaming**:
+  - Direct endpoint to ping models (`/api/v1/models/{id}/ping`) and verify credentials
+  - Direct endpoint to check model streaming support (`/api/v1/models/{id}/check-streaming`)
+  - Full support for real-time translation chunk streaming via WebSocket
 - **Async Job Queue & Concurrency Management**:
   - `sync` mode (blocking response) or `async` mode (returns job ID for polling)
   - Managed concurrency via `max_concurrent_jobs` setting
   - Automatic startup resume mechanism to recover queued/stuck jobs after server restarts
+  - Precise elapsed processing time tracking calculated dynamically on fetch
 - **Context & Glossary Retention**:
   - Automatic running plot summary maintenance across consecutive chapters
   - Glossary terms and character dictionaries injected into translation system prompts

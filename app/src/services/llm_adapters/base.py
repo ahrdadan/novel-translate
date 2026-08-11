@@ -24,3 +24,18 @@ class BaseLLMAdapter(ABC):
     ) -> str:
         """Send a prompt to the LLM and return the text response."""
         ...
+
+    @abstractmethod
+    async def call_stream(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str,
+        base_url: str,
+        api_key: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ):
+        """Send a prompt to the LLM and yield chunks of the text response."""
+        ...

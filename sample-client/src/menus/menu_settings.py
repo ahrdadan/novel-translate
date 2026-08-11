@@ -26,6 +26,7 @@ def menu_view_settings(api_client) -> None:
                     print("  [R] Resume System (Unpause)")
                 else:
                     print("  [P] Pause System (Hentikan eksekusi antrean)")
+                print("  [M] Ubah Default Translation Model ID")
                 print("  [Enter] Kembali ke Menu Utama")
                 
                 user_input = input(f"\n{BOLD}Pilihan Anda: {RESET}").strip().upper()
@@ -57,6 +58,17 @@ def menu_view_settings(api_client) -> None:
                         print(f"{GREEN}✅ System berhasil di-resume.{RESET}")
                     else:
                         print(f"{RED}❌ Gagal me-resume system: {patch_res.text}{RESET}")
+                        
+                elif user_input == 'M':
+                    new_val = input("Masukkan ID Model Default (angka, kosongkan untuk batal): ").strip()
+                    if new_val.isdigit():
+                        patch_res = api_client.patch(f"{api_client.api_v1}/settings", json={"default_translation_model_id": int(new_val)})
+                        if patch_res.status_code == 200:
+                            print(f"{GREEN}✅ Berhasil mengubah Default Translation Model ID menjadi {new_val}{RESET}")
+                        else:
+                            print(f"{RED}❌ Gagal mengubah: {patch_res.text}{RESET}")
+                    else:
+                        print(f"{YELLOW}Dibatalkan.{RESET}")
             else:
                 print(f"{RED}Gagal mengambil settings: {res.text}{RESET}")
                 break

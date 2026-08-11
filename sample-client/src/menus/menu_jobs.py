@@ -34,22 +34,38 @@ def menu_check_jobs(api_client) -> None:
         if processing:
             print(f"\n{BOLD}{GREEN}▶ SEDANG BERJALAN (PROCESSING):{RESET}")
             for j in processing:
-                print(f"  - Job #{j['id']} | Series #{j['series_id']} Ch #{j['chapter_number']} | Retry: {j.get('retry_count',0)}")
+                s_name = j.get('series_name') or f"Series #{j['series_id']}"
+                c_title = j.get('chapter_title') or f"Ch #{j['chapter_number']}"
+                elapsed = j.get('elapsed_seconds', 0)
+                time_str = f" | {elapsed}s" if elapsed > 0 else ""
+                print(f"  - Job #{j['id']} | {s_name} | {c_title} | Retry: {j.get('retry_count',0)}{time_str}")
         
         if queued:
             print(f"\n{BOLD}{YELLOW}⏳ DALAM ANTREAN (QUEUED):{RESET}")
             for j in queued:
-                print(f"  - Job #{j['id']} | Series #{j['series_id']} Ch #{j['chapter_number']} | Posisi: {j.get('queue_position', '-')}")
+                s_name = j.get('series_name') or f"Series #{j['series_id']}"
+                c_title = j.get('chapter_title') or f"Ch #{j['chapter_number']}"
+                print(f"  - Job #{j['id']} | {s_name} | {c_title} | Posisi: {j.get('queue_position', '-')}")
         
         if failed:
             print(f"\n{BOLD}{RED}❌ GAGAL (FAILED):{RESET}")
             for j in failed:
-                print(f"  - Job #{j['id']} | Series #{j['series_id']} Ch #{j['chapter_number']} | Error: {str(j.get('error'))[:50]}...")
+                s_name = j.get('series_name') or f"Series #{j['series_id']}"
+                c_title = j.get('chapter_title') or f"Ch #{j['chapter_number']}"
+                err_val = j.get('error')
+                err_str = (str(err_val) if err_val else "").strip()
+                if not err_str:
+                    err_str = "Unknown Error"
+                elif len(err_str) > 100:
+                    err_str = err_str[:100] + "..."
+                print(f"  - Job #{j['id']} | {s_name} | {c_title} | Error: {err_str}")
 
         if completed:
             print(f"\n{BOLD}{GREEN}✅ SELESAI (COMPLETED):{RESET}")
             for j in completed:
-                print(f"  - Job #{j['id']} | Series #{j['series_id']} Ch #{j['chapter_number']}")
+                s_name = j.get('series_name') or f"Series #{j['series_id']}"
+                c_title = j.get('chapter_title') or f"Ch #{j['chapter_number']}"
+                print(f"  - Job #{j['id']} | {s_name} | {c_title}")
 
         print(f"\n{BOLD}Total Ditampilkan: {len(jobs)} Job (Mengecualikan yang di-cancel user){RESET}")
 

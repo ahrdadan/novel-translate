@@ -47,7 +47,7 @@ class ResponsesAdapter(BaseLLMAdapter):
         max_retries = 2
         for attempt in range(1, max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0)) as client:
                     resp = await client.post(url, json=payload, headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
@@ -74,3 +74,27 @@ class ResponsesAdapter(BaseLLMAdapter):
                     await asyncio.sleep(sleep_time)
                 else:
                     raise
+
+    async def call_stream(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str,
+        base_url: str,
+        api_key: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ):
+        # NOTE: responses API (e.g. Vertex predict) streaming format varies heavily.
+        # Fallback to standard call and yield the whole response as a single chunk.
+        res = await self.call(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_name=model_name,
+            base_url=base_url,
+            api_key=api_key,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        yield res

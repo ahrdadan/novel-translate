@@ -16,6 +16,15 @@ class APIClient:
         except httpx.RequestError:
             return False
 
+    def fetch_platforms(self) -> list[dict[str, Any]]:
+        try:
+            res = self.client.get(f"{self.api_v1}/platforms")
+            if res.status_code == 200:
+                return res.json()
+        except httpx.RequestError:
+            return []
+        return []
+
     def fetch_models(self) -> list[dict[str, Any]]:
         try:
             res = self.client.get(f"{self.api_v1}/models")

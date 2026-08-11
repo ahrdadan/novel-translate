@@ -1,10 +1,60 @@
-from ..utils import BOLD, CYAN, MAGENTA, RED, RESET, YELLOW, print_json
+from ..utils import BOLD, CYAN, GREEN, MAGENTA, RED, RESET, YELLOW, print_json
 
 
 def menu_list_models(api_client) -> None:
-    print(f"\n{BOLD}{CYAN}[ 🤖 3. Models & Platforms List ]{RESET}")
-    models = api_client.fetch_models()
-    print_json("Registered Models", models if models else "Tidak ada model terdaftar.")
+    print(f"\n{BOLD}{CYAN}[ 🤖 3. Platforms & Models List ]{RESET}")
+    platforms = api_client.fetch_platforms()
+    if not platforms:
+        print_json("Registered Platforms", "Tidak ada platform terdaftar.")
+        return
+
+    # Refine output format for platforms to display models nicely
+    formatted_output = []
+    for p in platforms:
+        platform_data = {
+            "name": p.get("name"),
+            "apiKey": p.get("api_key"),
+            "apiType": p.get("api_type"),
+            "models": [
+                {
+                    "id": m.get("id"),
+                    "name": m.get("name"),
+                    "url": m.get("url")
+                } for m in p.get("models", [])
+            ]
+        }
+        formatted_output.append(platform_data)
+        
+    print_json("Registered Platforms & Models", formatted_output)
+
+    print(f"\n{BOLD}Pilihan Aksi:{RESET}")
+    print("  [P]   Ping / Test Model Endpoint (Check Streaming)")
+    print("  [Enter] Kembali")
+
+    user_act = input(f"\n{BOLD}Pilihan Anda [P / Enter]: {RESET}").strip()
+    if user_act.upper() == "P":
+        m_id = input(f"{BOLD}Masukkan ID Model untuk di-test: {RESET}").strip()
+        if m_id.isdigit():
+            print(f"\n{YELLOW}Menjalankan Ping Test untuk Model ID {m_id}...{RESET}")
+            try:
+                # Normal ping
+                res_ping = api_client.post(f"{api_client.api_v1}/models/{m_id}/ping")
+                if res_ping.status_code == 200:
+                    print(f"{GREEN}✅ Normal Ping Success!{RESET}")
+                    print_json("Ping Response", res_ping.json())
+                else:
+                    print(f"{RED}❌ Ping Failed! [{res_ping.status_code}]: {res_ping.text}{RESET}")
+
+                print(f"\n{YELLOW}Menjalankan Streaming Test untuk Model ID {m_id}...{RESET}")
+                res_stream = api_client.post(f"{api_client.api_v1}/models/{m_id}/check-streaming")
+                if res_stream.status_code == 200:
+                    print(f"{GREEN}✅ Streaming Test Success!{RESET}")
+                    print_json("Streaming Response", res_stream.json())
+                else:
+                    print(f"{RED}❌ Streaming Test Failed! [{res_stream.status_code}]: {res_stream.text}{RESET}")
+
+            except Exception as e:  # noqa: BLE001
+                print(f"{RED}Error koneksi: {e}{RESET}\n")
 
 def menu_list_series(api_client) -> None:
     print(f"\n{BOLD}{CYAN}[ 📚 4. Daftar & Detail Series (Termasuk Plot Summary Memory) ]{RESET}")

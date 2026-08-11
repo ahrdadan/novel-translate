@@ -9,7 +9,9 @@ from pydantic import BaseModel
 class JobResponse(BaseModel):
     id: int
     series_id: int
+    series_name: str | None = None
     chapter_number: float
+    chapter_title: str | None = None
     status: str
     force_translate: bool = False
     force_summary: bool = False

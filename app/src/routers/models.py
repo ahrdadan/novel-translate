@@ -68,3 +68,63 @@ async def get_model(model_id: int):
     if not model:
         raise HTTPException(404, "Model not found")
     return model
+
+
+@router.post("/models/{model_id}/ping")
+async def ping_model(model_id: int):
+    from src.services.llm_adapters import get_adapter
+    model = await model_repo.get_model_detail(model_id)
+    if not model:
+        raise HTTPException(404, "Model not found")
+    
+    platform = await platform_repo.get_platform_by_id(model["platform_id"])
+    if not platform:
+        raise HTTPException(404, "Platform not found")
+
+    adapter = get_adapter(platform.get("api_type", "chat-completions"))
+    try:
+        res = await adapter.call(
+            system_prompt="ping",
+            user_prompt="ping",
+            model_name=model["name"],
+            base_url=model.get("url") or "",
+            api_key=platform.get("api_key") or "",
+            max_tokens=1
+        )
+        return {"status": "success", "message": "Model ping successful", "response": res}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Ping failed: {e!s}")
+
+
+@router.post("/models/{model_id}/check-streaming")
+async def check_streaming(model_id: int):
+    from src.services.llm_adapters import get_adapter
+    model = await model_repo.get_model_detail(model_id)
+    if not model:
+        raise HTTPException(404, "Model not found")
+    
+    platform = await platform_repo.get_platform_by_id(model["platform_id"])
+    if not platform:
+        raise HTTPException(404, "Platform not found")
+
+    adapter = get_adapter(platform.get("api_type", "chat-completions"))
+    try:
+        chunks = []
+        async for chunk in adapter.call_stream(
+            system_prompt="Return exactly 'streaming_test'",
+            user_prompt="start",
+            model_name=model["name"],
+            base_url=model.get("url") or "",
+            api_key=platform.get("api_key") or "",
+            max_tokens=5
+        ):
+            chunks.append(chunk)
+        
+        return {
+            "status": "success",
+            "message": "Streaming works",
+            "chunks_received": len(chunks),
+            "final_text": "".join(chunks)
+        }
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Streaming check failed: {e!s}")
