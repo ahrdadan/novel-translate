@@ -11,7 +11,7 @@ from src.models.system_prompt import SystemPromptReference
 from src.models.unified import ModelReferenceInput, UnifiedTranslateRequest
 from src.repositories import chapter_repo, series_repo
 from src.routers.translate import _handle_async, _handle_sync
-from src.services import prompt_resolver
+from src.services import prompt_resolver, model_resolver
 
 router = APIRouter(tags=["⚡ Quickstart Translate"])
 
@@ -160,35 +160,80 @@ async def translate_novel_unified(body: UnifiedTranslateRequest):
         }
         chapter = await chapter_repo.create_chapter(chap_data)
 
-    # 3. Check Translation Status & Force Flags
-    if chapter["status"] == "translated" and not body.force_translate:
-        raise HTTPException(
-            409,
-            f"Chapter {chapter_num_input} in series '{series['name']}' is already translated. "
-            "Set force_translate=true to re-translate.",
-        )
-
-    # 4. Build Model & Prompt References
+    # 3. Resolve Models First (So we can check acceptance criteria per model)
     trans_ref = _model_ref_to_dict(body.translation_model)
     summarize_ref = _model_ref_to_dict(body.summarize_model)
     extract_ref = _model_ref_to_dict(body.extraction_model)
+    
+    # Use resolve_models_for_purpose to get a list of target models
+    target_models = await model_resolver.resolve_models_for_purpose("translation", trans_ref, series_id)
+
+    # 4. Filter Models based on Acceptance Criteria
+    accepted_models = []
+    skipped_models = []
+    
+    for model in target_models:
+        accept = False
+        if body.force_translate:
+            accept = True
+        elif chapter["status"] == "failed":
+            accept = True
+        elif chapter["status"] == "translated":
+            if chapter.get("translated_by_model_id") != model["id"]:
+                accept = True
+        elif chapter["status"] == "pending" and not chapter.get("translated_text"):
+            accept = True
+
+        if accept:
+            accepted_models.append(model)
+        else:
+            skipped_models.append(model)
+
+    if not accepted_models:
+        raise HTTPException(
+            409,
+            f"Chapter {chapter_num_input} in series '{series['name']}' is already translated or processing with the requested models. "
+            "Set force_translate=true to override."
+        )
+
+    # 5. Build Prompt References
     prompt_ref_raw = _prompt_ref_to_dict(body.system_prompt)
     prompt_ref = None
     if prompt_ref_raw:
         prompt_obj = await prompt_resolver.resolve_or_create_system_prompt(prompt_ref_raw)
         prompt_ref = {"system_prompt_id": prompt_obj["id"]} if prompt_obj.get("id") else prompt_ref_raw
 
-    # 5. Dispatch Execution Mode
+    # 6. Dispatch Execution Mode
+    results = []
+    for model in accepted_models:
+        # We pass the specific model ID back into the reference so _handle_async/_handle_sync uses exactly this model
+        single_trans_ref = {"model_id": model["id"]}
+        
+        if body.mode == "async":
+            result = await _handle_async(series_id, chapter_num_input, body, single_trans_ref, summarize_ref, extract_ref, prompt_ref)
+            result["series_id"] = series_id
+            result["series_name"] = series["name"]
+            result["model_id"] = model["id"]
+            results.append(result)
+        else:
+            result = await _handle_sync(series_id, chapter_num_input, chapter, body, single_trans_ref, summarize_ref, extract_ref, prompt_ref)
+            result["series_id"] = series_id
+            result["series_name"] = series["name"]
+            result["model_id"] = model["id"]
+            results.append(result)
 
-    if body.mode == "async":
-        result = await _handle_async(series_id, chapter_num_input, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
-        result["series_id"] = series_id
-        result["series_name"] = series["name"]
-        return result
-    else:
-        result = await _handle_sync(series_id, chapter_num_input, chapter, body, trans_ref, summarize_ref, extract_ref, prompt_ref)
-        result["series_id"] = series_id
-        result["series_name"] = series["name"]
-        return result
+    # If only one model was requested and accepted, return it directly to maintain backwards compatibility
+    if len(results) == 1 and not (isinstance(body.translation_model, dict) and "models" in str(body.translation_model)):
+        return results[0]
+        
+    return {
+        "mode": body.mode,
+        "series_id": series_id,
+        "series_name": series["name"],
+        "chapter_number": chapter_num_input,
+        "accepted_count": len(accepted_models),
+        "skipped_count": len(skipped_models),
+        "results": results
+    }
 
 

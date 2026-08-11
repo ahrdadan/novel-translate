@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from src.repositories import model_repo, platform_repo, series_repo, settings_repo
 
 
-async def resolve_or_create_model(ref: int | str | dict) -> dict:
-    """Resolve a model reference to a model dict.
+async def resolve_or_create_models(ref: int | str | dict) -> list[dict]:
+    """Resolve a model reference to a list of model dicts.
 
     Supports ultra-flexible references:
       - Direct integer/string model ID: 5 or "5" or {"model_id": 5}
@@ -24,7 +24,7 @@ async def resolve_or_create_model(ref: int | str | dict) -> dict:
         model = await model_repo.get_model_by_id(int(ref))
         if not model:
             raise HTTPException(404, f"Model {ref} not found")
-        return model
+        return [model]
 
     if not isinstance(ref, dict):
         raise HTTPException(400, "Invalid model reference format")
@@ -35,7 +35,7 @@ async def resolve_or_create_model(ref: int | str | dict) -> dict:
         model = await model_repo.get_model_by_id(root_model_id)
         if not model:
             raise HTTPException(404, f"Model {root_model_id} not found")
-        return model
+        return [model]
 
     platform_data = ref.get("platform", {})
     if not isinstance(platform_data, dict):
@@ -79,7 +79,7 @@ async def resolve_or_create_model(ref: int | str | dict) -> dict:
         if direct_model_id:
             model = await model_repo.get_model_by_id(direct_model_id)
             if model:
-                return model
+                return [model]
 
         raise HTTPException(
             400, "Inline model reference requires platform.id or platform.name"
@@ -104,13 +104,12 @@ async def resolve_or_create_model(ref: int | str | dict) -> dict:
         )
 
     # Resolve or create models under platform
-    target_model = None
+    resolved_models = []
     for m_item in models_list:
         if isinstance(m_item, (int, str)) and str(m_item).isdigit():
             model = await model_repo.get_model_by_id(int(m_item))
             if model:
-                if target_model is None:
-                    target_model = model
+                resolved_models.append(model)
                 continue
 
         m_data = {"name": m_item} if isinstance(m_item, str) else m_item
@@ -125,8 +124,7 @@ async def resolve_or_create_model(ref: int | str | dict) -> dict:
             if model:
                 if "url" in m_data:
                     model = await model_repo.update_model(m_id, {"url": m_data["url"]})
-                if target_model is None:
-                    target_model = model
+                resolved_models.append(model)
                 continue
 
         if not m_name:
@@ -146,32 +144,31 @@ async def resolve_or_create_model(ref: int | str | dict) -> dict:
                 url=m_data.get("url"),
             )
 
-        if target_model is None:
-            target_model = model
+        resolved_models.append(model)
 
-    if not target_model:
+    if not resolved_models:
         raise HTTPException(400, "Invalid model specification inside inline platform reference")
 
-    return target_model
+    return resolved_models
+
+
+async def resolve_or_create_model(ref: int | str | dict) -> dict:
+    """Resolve a single model reference (returns the first resolved model)."""
+    models = await resolve_or_create_models(ref)
+    return models[0]
 
 
 
 
-async def resolve_model_for_purpose(
+async def resolve_models_for_purpose(
     purpose: str,
     request_model_ref: dict | None,
     series_id: int,
-) -> dict:
-    """Full resolution chain per PRD §3.2:
-
-    1. request body model ref → resolve_or_create_model
-    2. series override (translation_model_id / extraction_model_id)
-    3. settings default (default_translation_model_id / default_extraction_model_id)
-    4. 400 error
-    """
+) -> list[dict]:
+    """Resolve multiple models for a purpose (e.g. for multi-model retry)."""
     # 1. Request body
     if request_model_ref:
-        return await resolve_or_create_model(request_model_ref)
+        return await resolve_or_create_models(request_model_ref)
 
     # 2. Series override
     series = await series_repo.get_series_by_id(series_id)
@@ -182,7 +179,7 @@ async def resolve_model_for_purpose(
     if series_model_id:
         model = await model_repo.get_model_by_id(series_model_id)
         if model:
-            return model
+            return [model]
 
     # 3. Settings default
     settings = await settings_repo.get_settings()
@@ -190,11 +187,11 @@ async def resolve_model_for_purpose(
     if default_model_id:
         model = await model_repo.get_model_by_id(default_model_id)
         if model:
-            return model
+            return [model]
 
     # 4. Fallback for summarization or extraction: Use Translation Model if dedicated model is not set
     if purpose in ("summarization", "extraction"):
-        return await resolve_model_for_purpose("translation", request_model_ref, series_id)
+        return await resolve_models_for_purpose("translation", request_model_ref, series_id)
 
     # 5. Error
     raise HTTPException(
@@ -202,3 +199,13 @@ async def resolve_model_for_purpose(
         f"No {purpose} model configured. Set a default in /settings, "
         f"assign one to the series, or pass model reference in the request.",
     )
+
+
+async def resolve_model_for_purpose(
+    purpose: str,
+    request_model_ref: dict | None,
+    series_id: int,
+) -> dict:
+    """Full resolution chain returning a single model."""
+    models = await resolve_models_for_purpose(purpose, request_model_ref, series_id)
+    return models[0]
