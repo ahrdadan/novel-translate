@@ -1,7 +1,6 @@
 """Settings router — GET /settings, PATCH /settings."""
 
 from fastapi import APIRouter
-
 from src.models.settings import SettingsResponse, SettingsUpdate
 from src.repositories import settings_repo
 

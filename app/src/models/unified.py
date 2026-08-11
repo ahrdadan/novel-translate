@@ -1,7 +1,6 @@
 """Unified translate request schemas for the all-in-one endpoint (POST /api/v1/translate-novel)."""
 
 from pydantic import BaseModel, Field
-
 from src.models.system_prompt import SystemPromptReference
 
 
@@ -50,6 +49,7 @@ class UnifiedTranslateRequest(BaseModel):
     summarize_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="summarizeModel")
     extraction_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="extractionModel")
     system_prompt: SystemPromptReference | int | str | dict | None = Field(None, alias="systemPrompt")
+    llm_timeout: int | None = Field(None, alias="llmTimeout")
 
     model_config = {"populate_by_name": True}
 

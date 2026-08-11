@@ -6,7 +6,6 @@ they are created automatically on-the-fly.
 """
 
 from fastapi import APIRouter, HTTPException
-
 from src.html_parser import convert_html_to_md
 from src.models.system_prompt import SystemPromptReference
 from src.models.unified import ModelReferenceInput, UnifiedTranslateRequest

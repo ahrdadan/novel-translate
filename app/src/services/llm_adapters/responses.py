@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 import httpx
-
 from src.services.llm_adapters.base import BaseLLMAdapter
 
 logger = logging.getLogger(__name__)
@@ -21,6 +20,7 @@ class ResponsesAdapter(BaseLLMAdapter):
         api_key: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout: int = 600,
     ) -> str:
         base_clean = base_url.rstrip("/")
         if base_clean.endswith(("/v1/responses", "/responses")):
@@ -47,7 +47,7 @@ class ResponsesAdapter(BaseLLMAdapter):
         max_retries = 2
         for attempt in range(1, max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0)) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(float(timeout), connect=10.0)) as client:
                     resp = await client.post(url, json=payload, headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
@@ -85,6 +85,7 @@ class ResponsesAdapter(BaseLLMAdapter):
         api_key: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout: int = 600,
     ):
         # NOTE: responses API (e.g. Vertex predict) streaming format varies heavily.
         # Fallback to standard call and yield the whole response as a single chunk.
@@ -96,5 +97,6 @@ class ResponsesAdapter(BaseLLMAdapter):
             api_key=api_key,
             max_tokens=max_tokens,
             temperature=temperature,
+            timeout=timeout,
         )
         yield res

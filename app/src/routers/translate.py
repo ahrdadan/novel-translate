@@ -8,9 +8,14 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-
 from src.models.system_prompt import SystemPromptReference
-from src.repositories import chapter_repo, job_repo, platform_repo, series_repo
+from src.repositories import (
+    chapter_repo,
+    job_repo,
+    platform_repo,
+    series_repo,
+    settings_repo,
+)
 from src.services import extractor, model_resolver, single_pass, summarizer, translator
 
 router = APIRouter(prefix="/series/{series_id}/chapters/{chapter_number}", tags=["translate"])
@@ -36,6 +41,7 @@ class TranslateRequest(BaseModel):
     summarize_model: ModelReference | None = Field(None, alias="summarizeModel")
     extraction_model: ModelReference | None = Field(None, alias="extractionModel")
     system_prompt: SystemPromptReference | None = Field(None, alias="systemPrompt")
+    llm_timeout: int | None = Field(None, alias="llmTimeout")
 
     model_config = {"populate_by_name": True}
 
@@ -159,6 +165,7 @@ async def _handle_async(
         "summarize_model_ref": summarize_ref,
         "extraction_model_ref": extract_ref,
         "system_prompt_ref": prompt_ref,
+        "llm_timeout": body.llm_timeout,
     })
     return {
         "mode": "async",
@@ -185,6 +192,11 @@ async def _handle_sync(
     )
     trans_platform = await platform_repo.get_platform_by_id(trans_model["platform_id"])
 
+    llm_timeout = body.llm_timeout
+    if llm_timeout is None:
+        settings = await settings_repo.get_settings()
+        llm_timeout = settings.get("default_llm_timeout", 600)
+
     if body.strategy == "single_pass":
         res = await single_pass.translate_chapter_single_pass(
             source_text=chapter["source_text"],
@@ -193,6 +205,7 @@ async def _handle_sync(
             model=trans_model,
             platform=trans_platform,
             system_prompt_ref=prompt_ref,
+            llm_timeout=llm_timeout,
         )
         translated_text = res["translated_text"]
         chapter_summary = res["chapter_summary"]
@@ -207,6 +220,7 @@ async def _handle_sync(
             model=trans_model,
             platform=trans_platform,
             system_prompt_ref=prompt_ref,
+            llm_timeout=llm_timeout,
         )
 
         # 2. Summarize (resolve summarize_model if provided, otherwise trans_model)

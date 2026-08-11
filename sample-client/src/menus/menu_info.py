@@ -12,6 +12,7 @@ def menu_list_models(api_client) -> None:
     formatted_output = []
     for p in platforms:
         platform_data = {
+            "id": p.get("id"),
             "name": p.get("name"),
             "apiKey": p.get("api_key"),
             "apiType": p.get("api_type"),
@@ -29,9 +30,12 @@ def menu_list_models(api_client) -> None:
 
     print(f"\n{BOLD}Pilihan Aksi:{RESET}")
     print("  [P]   Ping / Test Model Endpoint (Check Streaming)")
+    print("  [AP]  Add Platform (via JSON)")
+    print("  [DP]  Delete Platform")
+    print("  [DM]  Delete Model")
     print("  [Enter] Kembali")
 
-    user_act = input(f"\n{BOLD}Pilihan Anda [P / Enter]: {RESET}").strip()
+    user_act = input(f"\n{BOLD}Pilihan Anda [P / AP / DP / DM / Enter]: {RESET}").strip()
     if user_act.upper() == "P":
         m_id = input(f"{BOLD}Masukkan ID Model untuk di-test: {RESET}").strip()
         if m_id.isdigit():
@@ -55,6 +59,85 @@ def menu_list_models(api_client) -> None:
 
             except Exception as e:  # noqa: BLE001
                 print(f"{RED}Error koneksi: {e}{RESET}\n")
+    elif user_act.upper() == "AP":
+        print(f"\n{BOLD}Masukkan JSON konfigurasi platform (Bisa berupa object/array).")
+        print(f"Ketik 'EOF' di baris baru lalu Enter untuk selesai:{RESET}")
+        lines = []
+        while True:
+            try:
+                line = input()
+                if line.strip() == "EOF":
+                    break
+                lines.append(line)
+            except EOFError:
+                break
+        
+        json_str = "\n".join(lines).strip()
+        if not json_str:
+            print(f"{YELLOW}Input kosong, dibatalkan.{RESET}")
+            return
+
+        # Try to parse
+        if json_str.endswith(","):
+            json_str = json_str[:-1]
+        
+        import json
+        data = None
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            try:
+                # Attempt to wrap with braces in case user copied '"platform": {...}'
+                data = json.loads(f"{{{json_str}}}")
+            except json.JSONDecodeError as e:
+                print(f"{RED}Error: JSON tidak valid. Pastikan format benar. ({e}){RESET}")
+                return
+
+        def create_platform(p_data):
+            res = api_client.post(f"{api_client.api_v1}/platforms", json=p_data)
+            if res.status_code == 201:
+                p = res.json()
+                print(f"{GREEN}✅ Platform '{p.get('name')}' berhasil ditambahkan (ID: {p.get('id')}).{RESET}")
+            else:
+                print(f"{RED}❌ Gagal menambahkan platform '{p_data.get('name')}'. [{res.status_code}]: {res.text}{RESET}")
+
+        if isinstance(data, list):
+            for item in data:
+                if "platform" in item and isinstance(item["platform"], dict):
+                    create_platform(item["platform"])
+                else:
+                    create_platform(item)
+        elif isinstance(data, dict):
+            # Check if it's wrapped in {"platform": ...} or {"translationModel": {"platform": ...}}
+            if "translationModel" in data and isinstance(data["translationModel"], dict):
+                data = data["translationModel"]
+            if "platform" in data and isinstance(data["platform"], dict):
+                data = data["platform"]
+            create_platform(data)
+        else:
+            print(f"{RED}Error: Format data tidak dikenali. Harus berupa object atau array.{RESET}")
+
+    elif user_act.upper() == "DP":
+        p_id = input(f"{BOLD}Masukkan ID Platform yang akan dihapus: {RESET}").strip()
+        if p_id.isdigit():
+            confirm = input(f"{YELLOW}Yakin ingin menghapus Platform ID {p_id} beserta semua modelnya? (y/n): {RESET}").strip().lower()
+            if confirm == 'y':
+                res = api_client.delete(f"{api_client.api_v1}/platforms/{p_id}")
+                if res.status_code == 204:
+                    print(f"{GREEN}✅ Platform ID {p_id} berhasil dihapus.{RESET}")
+                else:
+                    print(f"{RED}❌ Gagal menghapus Platform ID {p_id}. [{res.status_code}]: {res.text}{RESET}")
+    elif user_act.upper() == "DM":
+        p_id = input(f"{BOLD}Masukkan ID Platform dari model tersebut: {RESET}").strip()
+        m_id = input(f"{BOLD}Masukkan ID Model yang akan dihapus: {RESET}").strip()
+        if p_id.isdigit() and m_id.isdigit():
+            confirm = input(f"{YELLOW}Yakin ingin menghapus Model ID {m_id} di Platform ID {p_id}? (y/n): {RESET}").strip().lower()
+            if confirm == 'y':
+                res = api_client.delete(f"{api_client.api_v1}/platforms/{p_id}/models/{m_id}")
+                if res.status_code == 204:
+                    print(f"{GREEN}✅ Model ID {m_id} berhasil dihapus.{RESET}")
+                else:
+                    print(f"{RED}❌ Gagal menghapus Model ID {m_id}. [{res.status_code}]: {res.text}{RESET}")
 
 def menu_list_series(api_client) -> None:
     print(f"\n{BOLD}{CYAN}[ 📚 4. Daftar & Detail Series (Termasuk Plot Summary Memory) ]{RESET}")

@@ -1,7 +1,6 @@
 """System prompt resolution service — resolve inline, series, settings, or default system prompts."""
 
 from fastapi import HTTPException
-
 from src.repositories import series_repo, settings_repo, system_prompt_repo
 
 

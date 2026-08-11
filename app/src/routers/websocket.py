@@ -1,7 +1,6 @@
 """WebSocket router — GET /ws/jobs for real-time background job monitoring."""
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
 from src.repositories import job_repo
 from src.services.ws_manager import ws_manager
 

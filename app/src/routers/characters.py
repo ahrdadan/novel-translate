@@ -1,7 +1,6 @@
 """Characters router — CRUD for characters (PRD §6.3)."""
 
 from fastapi import APIRouter, HTTPException
-
 from src.models.character import CharacterCreate, CharacterResponse, CharacterUpdate
 from src.repositories import character_repo, series_repo
 

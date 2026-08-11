@@ -5,24 +5,25 @@
     "targetLanguage": "Indonesian"
   },
   "chapter": {
-    "chapterNumber": 1,
-    "title": "Lee Ha-young",
-    "file": "novel-html/response_chapter0006.html"
+    "chapterNumber": 2,
+    "title": "Lee Ha-young (2)",
+    "file": "novel-html/response_chapter0007.html"
   },
   "translationModel": {
     "platform": {
-      "name": "nvidia1",
-      "apiKey": "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",
+      "name": "tokenrouter2",
+      "apiKey": "sk-2Yzp4Txd8XOMV35OlqFajmiZKHVAhv8rFUUQfnSC6HTuv46h",
       "apiType": "chat-completions",
       "models": [
         {
-          "name": "openai/gpt-oss-120b",
-          "url": "https://integrate.api.nvidia.com/v1"
+          "name": "moonshotai/kimi-k3-free",
+          "url": "https://api.tokenrouter.com/v1"
         }
       ]
     }
   },
   "mode": "async",
   "strategy": "single_pass",
-  "forceTranslate": true
+  "forceTranslate": true,
+  "llmTimeout": 300
 }

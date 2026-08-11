@@ -4,7 +4,7 @@ System prompt is resolved dynamically via DB or request/series overrides.
 Critical previous context instruction is always appended automatically.
 """
 
-from typing import Any
+from collections.abc import Awaitable, Callable
 
 from src.repositories import chapter_repo, glossary_repo
 from src.services import prompt_resolver
@@ -41,8 +41,9 @@ async def translate_chapter(
     model: dict,
     platform: dict,
     system_prompt_ref: dict | None = None,
-    progress_callback: Any | None = None,
+    progress_callback: Callable[[dict], Awaitable[None]] | None = None,
     stream_callback=None,
+    llm_timeout: int = 600,
     return_details: bool = False,
 ) -> str | dict:
     """Translate a full chapter in one shot (No Chunking).
@@ -101,6 +102,7 @@ async def translate_chapter(
             model_name=model["name"],
             base_url=base_url,
             api_key=api_key,
+            timeout=llm_timeout,
         ):
             chunks.append(chunk)
             await stream_callback(chunk)
@@ -112,6 +114,7 @@ async def translate_chapter(
             model_name=model["name"],
             base_url=base_url,
             api_key=api_key,
+            timeout=llm_timeout,
         )
 
     if progress_callback:

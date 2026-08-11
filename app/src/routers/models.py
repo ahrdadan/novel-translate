@@ -1,7 +1,6 @@
 """Models router — nested under platform + flat listing (PRD §6.2)."""
 
 from fastapi import APIRouter, HTTPException
-
 from src.models.model import (
     ModelCreate,
     ModelDetailResponse,

@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 import httpx
-
 from src.services.llm_adapters.base import BaseLLMAdapter
 
 logger = logging.getLogger(__name__)
@@ -21,6 +20,7 @@ class ChatCompletionsAdapter(BaseLLMAdapter):
         api_key: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout: int = 600,
     ) -> str:
         base_clean = base_url.rstrip("/")
         if base_clean.endswith(("/v1/chat/completions", "/chat/completions")):
@@ -49,7 +49,7 @@ class ChatCompletionsAdapter(BaseLLMAdapter):
         max_retries = 2
         for attempt in range(1, max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0)) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(float(timeout), connect=10.0)) as client:
                     resp = await client.post(url, json=payload, headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
@@ -76,6 +76,7 @@ class ChatCompletionsAdapter(BaseLLMAdapter):
         api_key: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout: int = 600,
     ):
         import json
         base_clean = base_url.rstrip("/")
@@ -107,7 +108,7 @@ class ChatCompletionsAdapter(BaseLLMAdapter):
         for attempt in range(1, max_retries + 1):
             try:
                 async with (
-                    httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0)) as client,
+                    httpx.AsyncClient(timeout=httpx.Timeout(float(timeout), connect=10.0)) as client,
                     client.stream("POST", url, json=payload, headers=headers) as resp
                 ):
                     resp.raise_for_status()

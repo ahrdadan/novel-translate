@@ -1,7 +1,6 @@
 """System Prompts router — CRUD endpoints for system_prompts table."""
 
 from fastapi import APIRouter, HTTPException, status
-
 from src.models.system_prompt import (
     SystemPromptCreate,
     SystemPromptResponse,

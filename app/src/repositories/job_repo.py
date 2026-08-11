@@ -11,8 +11,8 @@ async def create_job(data: dict) -> dict:
     cursor = await db.execute(
         """INSERT INTO jobs
            (series_id, chapter_number, status, force_translate, force_summary,
-            extract, translation_model_ref, extraction_model_ref, strategy)
-           VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?)""",
+            extract, translation_model_ref, extraction_model_ref, strategy, llm_timeout)
+           VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)""",
         (
             data["series_id"],
             data["chapter_number"],
@@ -22,6 +22,7 @@ async def create_job(data: dict) -> dict:
             json.dumps(data.get("translation_model_ref")) if data.get("translation_model_ref") else None,
             json.dumps(data.get("extraction_model_ref")) if data.get("extraction_model_ref") else None,
             data.get("strategy", "pipeline"),
+            data.get("llm_timeout"),
         ),
     )
     await db.commit()

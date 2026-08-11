@@ -47,6 +47,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE settings ADD COLUMN is_paused INTEGER DEFAULT 0")
     if settings_cols and "allow_concurrent_different_models" not in settings_cols:
         await db.execute("ALTER TABLE settings ADD COLUMN allow_concurrent_different_models INTEGER DEFAULT 0")
+    if settings_cols and "default_llm_timeout" not in settings_cols:
+        await db.execute("ALTER TABLE settings ADD COLUMN default_llm_timeout INTEGER DEFAULT 600")
 
     # Check series columns
     cursor = await db.execute("PRAGMA table_info(series)")
@@ -63,6 +65,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE jobs ADD COLUMN strategy TEXT DEFAULT 'pipeline'")
     if jobs_cols and "extract" not in jobs_cols:
         await db.execute("ALTER TABLE jobs ADD COLUMN extract INTEGER DEFAULT 1")
+    if jobs_cols and "llm_timeout" not in jobs_cols:
+        await db.execute("ALTER TABLE jobs ADD COLUMN llm_timeout INTEGER")
 
     # Check chapters columns
     cursor = await db.execute("PRAGMA table_info(chapters)")
@@ -137,6 +141,7 @@ CREATE TABLE IF NOT EXISTS settings (
     default_system_prompt_id INTEGER REFERENCES system_prompts(id) DEFAULT 1,
     is_paused INTEGER DEFAULT 0,
     allow_concurrent_different_models INTEGER DEFAULT 0,
+    default_llm_timeout INTEGER DEFAULT 600,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -216,6 +221,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     extraction_model_ref TEXT,
     system_prompt_ref TEXT,
     strategy TEXT DEFAULT 'pipeline',
+    llm_timeout INTEGER,
     result TEXT,
     error TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

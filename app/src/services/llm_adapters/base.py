@@ -21,6 +21,7 @@ class BaseLLMAdapter(ABC):
         api_key: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout: int = 600,
     ) -> str:
         """Send a prompt to the LLM and return the text response."""
         ...
@@ -36,6 +37,7 @@ class BaseLLMAdapter(ABC):
         api_key: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout: int = 600,
     ):
         """Send a prompt to the LLM and yield chunks of the text response."""
         ...

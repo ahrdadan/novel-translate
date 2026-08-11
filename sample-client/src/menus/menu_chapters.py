@@ -27,7 +27,11 @@ def menu_view_translated_chapters(api_client) -> None:
             break
 
         jobs = api_client.fetch_jobs(series_id=series_id)
-        job_by_chap = {j.get("chapter_number"): j for j in jobs if j.get("chapter_number")}
+        job_by_chap = {}
+        for j in jobs:
+            c_num = j.get("chapter_number")
+            if c_num is not None and c_num not in job_by_chap:
+                job_by_chap[c_num] = j
 
         print(f"\n{BOLD}{CYAN}Daftar Chapter untuk Series '{series_name}' (ID: {series_id}):{RESET}")
         for c in chapters:
@@ -78,15 +82,36 @@ def menu_view_translated_chapters(api_client) -> None:
             if not failed_chaps:
                 print(f"{YELLOW}Tidak ada chapter yang failed di series ini.{RESET}")
             else:
+                print(f"\n{BOLD}Pilih Mode Retry:{RESET}")
+                print(f"  {GREEN}[D]{RESET} Default (Gunakan model bawaan series/global)")
+                print(f"  {GREEN}[M]{RESET} Multi-Model (Distribusi ke beberapa model secara paralel)")
+                mode_choice = input("Pilihan Anda [D/M]: ").strip().upper()
+
+                model_ids = []
+                if mode_choice == "M":
+                    ids_input = input(f"{BOLD}Masukkan ID Model yang ingin dipakai (pisahkan dengan koma, misal: 1,4,5): {RESET}").strip()
+                    for x in ids_input.split(","):
+                        if x.strip().isdigit():
+                            model_ids.append(int(x.strip()))
+                    if not model_ids:
+                        print(f"{YELLOW}Tidak ada ID Model valid. Menggunakan Default.{RESET}")
+
                 print(f"\n{BOLD}{CYAN}Mengirim Request Retranslate untuk {len(failed_chaps)} chapter...{RESET}")
-                for c_num in failed_chaps:
+                for idx, c_num in enumerate(failed_chaps):
+                    payload = {"mode": "async", "forceTranslate": True}
+                    assigned_model_id = None
+                    if model_ids:
+                        assigned_model_id = model_ids[idx % len(model_ids)]
+                        payload["translationModel"] = {"modelId": assigned_model_id}
+
                     try:
                         retry_res = api_client.post(
                             f"{api_client.api_v1}/series/{series_id}/chapters/{c_num}/retranslate",
-                            json={"mode": "async", "forceTranslate": True}
+                            json=payload
                         )
                         if retry_res.status_code in (200, 201, 202):
-                            print(f"  {GREEN}✅ Ch #{c_num} di-retry!{RESET}")
+                            msg_model = f" dengan Model ID {assigned_model_id}" if assigned_model_id else ""
+                            print(f"  {GREEN}✅ Ch #{c_num} di-retry{msg_model}!{RESET}")
                         else:
                             print(f"  {RED}❌ Ch #{c_num} gagal retry: {retry_res.text}{RESET}")
                     except Exception as e:  # noqa: BLE001

@@ -4,7 +4,6 @@ Implements PRD v2 §3.2 and §3.3.
 """
 
 from fastapi import HTTPException
-
 from src.repositories import model_repo, platform_repo, series_repo, settings_repo
 
 

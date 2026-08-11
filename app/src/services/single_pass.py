@@ -5,6 +5,7 @@ Implements single_pass execution strategy.
 
 import json
 import logging
+from collections.abc import Awaitable, Callable
 
 from src.repositories import chapter_repo, character_repo, glossary_repo
 from src.services import prompt_resolver
@@ -50,7 +51,8 @@ async def translate_chapter_single_pass(
     model: dict,
     platform: dict,
     system_prompt_ref: dict | None = None,
-    stream_callback=None,
+    stream_callback: Callable[[str], Awaitable[None]] | None = None,
+    llm_timeout: int = 600,
 ) -> dict:
     """Execute translation, summarization, and extraction in a single LLM call.
 
@@ -97,6 +99,7 @@ async def translate_chapter_single_pass(
             model_name=model["name"],
             base_url=base_url,
             api_key=api_key,
+            timeout=llm_timeout,
         ):
             chunks.append(chunk)
             await stream_callback(chunk)
@@ -108,6 +111,7 @@ async def translate_chapter_single_pass(
             model_name=model["name"],
             base_url=base_url,
             api_key=api_key,
+            timeout=llm_timeout,
         )
 
     # 5. Parse JSON output with robust regex extraction & fuzzy anti-typo parsing

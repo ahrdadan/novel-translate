@@ -1,7 +1,6 @@
 """Platforms router — CRUD for platforms (PRD §6.2)."""
 
 from fastapi import APIRouter, HTTPException
-
 from src.models.platform import PlatformCreate, PlatformResponse, PlatformUpdate
 from src.repositories import model_repo, platform_repo
 

@@ -1,7 +1,6 @@
 """Chapters router — CRUD + context preview (PRD §6.5, §6.8)."""
 
 from fastapi import APIRouter, HTTPException
-
 from src.models.chapter import (
     ChapterContextResponse,
     ChapterCreate,
