@@ -205,6 +205,10 @@ async def restore_snapshot(
                 # Perform safe online restore
                 await temp_conn.backup(db)
 
+                # Apply schema migrations to upgrade older snapshots to current schema
+                from src.database import _apply_migrations
+                await _apply_migrations(db)
+
         elif filename.endswith(".json"):
             with open(upload_path, "r", encoding="utf-8") as f:  # noqa: ASYNC230
                 json_data = json.load(f)
@@ -257,6 +261,10 @@ async def restore_snapshot(
                     restored_counts[table] = len(rows)
 
                 await db.commit()
+
+                # Apply schema migrations to upgrade older snapshots to current schema
+                from src.database import _apply_migrations
+                await _apply_migrations(db)
             finally:
                 await db.execute("PRAGMA foreign_keys = ON")
 
