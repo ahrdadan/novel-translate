@@ -45,10 +45,10 @@ class UnifiedTranslateRequest(BaseModel):
     force_translate: bool = Field(False, alias="forceTranslate")
     force_summary: bool = Field(False, alias="forceSummary")
     extract: bool = True
-    translation_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="translationModel")
-    summarize_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="summarizeModel")
-    extraction_model: ModelReferenceInput | int | str | dict | None = Field(None, alias="extractionModel")
-    system_prompt: SystemPromptReference | int | str | dict | None = Field(None, alias="systemPrompt")
+    translation_model: ModelReferenceInput | int | str | dict | list | None = Field(None, alias="translationModel")
+    summarize_model: ModelReferenceInput | int | str | dict | list | None = Field(None, alias="summarizeModel")
+    extraction_model: ModelReferenceInput | int | str | dict | list | None = Field(None, alias="extractionModel")
+    system_prompt: SystemPromptReference | int | str | dict | list | None = Field(None, alias="systemPrompt")
     llm_timeout: int | None = Field(None, alias="llmTimeout")
 
     model_config = {"populate_by_name": True}

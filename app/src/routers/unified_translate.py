@@ -16,9 +16,11 @@ from src.services import prompt_resolver, model_resolver
 router = APIRouter(tags=["⚡ Quickstart Translate"])
 
 
-def _model_ref_to_dict(ref: ModelReferenceInput | int | str | dict | None) -> dict | int | None:
+def _model_ref_to_dict(ref: ModelReferenceInput | int | str | dict | list | None) -> dict | int | list | None:
     if ref is None:
         return None
+    if isinstance(ref, list):
+        return [_model_ref_to_dict(r) for r in ref]
     if isinstance(ref, (int, str)) and str(ref).isdigit():
         return {"model_id": int(ref)}
     if isinstance(ref, dict):

@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from src.repositories import model_repo, platform_repo, series_repo, settings_repo
 
 
-async def resolve_or_create_models(ref: int | str | dict) -> list[dict]:
+async def resolve_or_create_models(ref: int | str | dict | list) -> list[dict]:
     """Resolve a model reference to a list of model dicts.
 
     Supports ultra-flexible references:
@@ -16,10 +16,18 @@ async def resolve_or_create_models(ref: int | str | dict) -> list[dict]:
       - Existing platform ID + model Name: {"platform": {"id": 1}, "model": {"name": "gpt-4o"}}
       - Platform Name + Single Model: {"platform": {"name": "aihubmix", "model": {"name": "gpt-4o", "url": "..."}}}
       - Platform Name + Models Array: {"platform": {"name": "aihubmix", "models": [{"name": "gpt-4o"}]}}
+      - List of any of the above
 
     Uses create-or-append logic: existing platform/models are updated only
     for fields explicitly sent; missing fields keep their old values.
     """
+    if isinstance(ref, list):
+        resolved_models = []
+        for r in ref:
+            models = await resolve_or_create_models(r)
+            resolved_models.extend(models)
+        return resolved_models
+
     if isinstance(ref, (int, str)) and str(ref).isdigit():
         model = await model_repo.get_model_by_id(int(ref))
         if not model:
