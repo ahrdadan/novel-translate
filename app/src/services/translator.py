@@ -43,7 +43,8 @@ async def translate_chapter(
     system_prompt_ref: dict | None = None,
     progress_callback: Callable[[dict], Awaitable[None]] | None = None,
     stream_callback=None,
-    llm_timeout: int = 600,
+    llm_timeout: int = 40000,
+    max_tokens: int = 64000,
     return_details: bool = False,
 ) -> str | dict:
     """Translate a full chapter in one shot (No Chunking).
@@ -103,6 +104,7 @@ async def translate_chapter(
             base_url=base_url,
             api_key=api_key,
             timeout=llm_timeout,
+            max_tokens=max_tokens,
         ):
             chunks.append(chunk)
             await stream_callback(chunk)
@@ -115,6 +117,7 @@ async def translate_chapter(
             base_url=base_url,
             api_key=api_key,
             timeout=llm_timeout,
+            max_tokens=max_tokens,
         )
 
     if progress_callback:

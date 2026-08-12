@@ -49,6 +49,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE settings ADD COLUMN allow_concurrent_different_models INTEGER DEFAULT 0")
     if settings_cols and "default_llm_timeout" not in settings_cols:
         await db.execute("ALTER TABLE settings ADD COLUMN default_llm_timeout INTEGER DEFAULT 600")
+    if settings_cols and "default_max_tokens" not in settings_cols:
+        await db.execute("ALTER TABLE settings ADD COLUMN default_max_tokens INTEGER DEFAULT 64000")
 
     # Check series columns
     cursor = await db.execute("PRAGMA table_info(series)")
@@ -67,6 +69,8 @@ async def _apply_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE jobs ADD COLUMN extract INTEGER DEFAULT 1")
     if jobs_cols and "llm_timeout" not in jobs_cols:
         await db.execute("ALTER TABLE jobs ADD COLUMN llm_timeout INTEGER")
+    if jobs_cols and "max_tokens" not in jobs_cols:
+        await db.execute("ALTER TABLE jobs ADD COLUMN max_tokens INTEGER")
 
     # Check chapters columns
     cursor = await db.execute("PRAGMA table_info(chapters)")
@@ -142,6 +146,7 @@ CREATE TABLE IF NOT EXISTS settings (
     is_paused INTEGER DEFAULT 0,
     allow_concurrent_different_models INTEGER DEFAULT 0,
     default_llm_timeout INTEGER DEFAULT 600,
+    default_max_tokens INTEGER DEFAULT 64000,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -222,6 +227,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     system_prompt_ref TEXT,
     strategy TEXT DEFAULT 'pipeline',
     llm_timeout INTEGER,
+    max_tokens INTEGER,
     result TEXT,
     error TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -13,7 +13,8 @@ class SettingsResponse(BaseModel):
     default_system_prompt_id: int | None = None
     is_paused: bool = False
     allow_concurrent_different_models: bool = False
-    default_llm_timeout: int = 600
+    default_llm_timeout: int = 40000
+    default_max_tokens: int = 64000
     updated_at: datetime | None = None
 
 
@@ -25,3 +26,4 @@ class SettingsUpdate(BaseModel):
     is_paused: bool | None = None
     allow_concurrent_different_models: bool | None = None
     default_llm_timeout: int | None = None
+    default_max_tokens: int | None = None

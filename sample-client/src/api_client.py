@@ -7,7 +7,7 @@ class APIClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip('/')
         self.api_v1 = f"{self.base_url}/api/v1"
-        self.client = httpx.Client(timeout=60.0)
+        self.client = httpx.Client(timeout=3600.0)
 
     def check_server(self) -> bool:
         try:

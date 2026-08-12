@@ -151,6 +151,16 @@ def process_config_file(api_client, config_path: str) -> bool:
         if "systemPrompt" in config_data:
             payload["systemPrompt"] = config_data["systemPrompt"]
             
+        if "llmTimeout" in config_data:
+            payload["llmTimeout"] = config_data["llmTimeout"]
+        elif "llm_timeout" in config_data:
+            payload["llmTimeout"] = config_data["llm_timeout"]
+            
+        if "maxTokens" in config_data:
+            payload["maxTokens"] = config_data["maxTokens"]
+        elif "max_tokens" in config_data:
+            payload["maxTokens"] = config_data["max_tokens"]
+            
         # Add force flags if they exist
         if "forceTranslate" in config_data:
             payload["forceTranslate"] = config_data["forceTranslate"]

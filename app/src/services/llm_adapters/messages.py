@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import httpx
+
 from src.services.llm_adapters.base import BaseLLMAdapter
 
 logger = logging.getLogger(__name__)

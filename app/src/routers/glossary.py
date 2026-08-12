@@ -1,6 +1,7 @@
 """Glossary router — CRUD for glossary_terms (PRD §6.3)."""
 
 from fastapi import APIRouter, HTTPException
+
 from src.models.glossary import (
     GlossaryTermCreate,
     GlossaryTermResponse,

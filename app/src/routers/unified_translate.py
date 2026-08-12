@@ -6,12 +6,13 @@ they are created automatically on-the-fly.
 """
 
 from fastapi import APIRouter, HTTPException
+
 from src.html_parser import convert_html_to_md
 from src.models.system_prompt import SystemPromptReference
 from src.models.unified import ModelReferenceInput, UnifiedTranslateRequest
 from src.repositories import chapter_repo, series_repo
 from src.routers.translate import _handle_async, _handle_sync
-from src.services import prompt_resolver, model_resolver
+from src.services import model_resolver, prompt_resolver
 
 router = APIRouter(tags=["⚡ Quickstart Translate"])
 
@@ -176,9 +177,7 @@ async def translate_novel_unified(body: UnifiedTranslateRequest):
     
     for model in target_models:
         accept = False
-        if body.force_translate:
-            accept = True
-        elif chapter["status"] == "failed":
+        if body.force_translate or chapter["status"] == "failed":
             accept = True
         elif chapter["status"] == "translated":
             if chapter.get("translated_by_model_id") != model["id"]:

@@ -1,6 +1,7 @@
 """Series router — CRUD + status + summary (PRD §6.3, §6.4)."""
 
 from fastapi import APIRouter, HTTPException
+
 from src.models.series import (
     SeriesCreate,
     SeriesResponse,

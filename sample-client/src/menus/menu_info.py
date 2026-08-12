@@ -78,8 +78,7 @@ def menu_list_models(api_client) -> None:
             return
 
         # Try to parse
-        if json_str.endswith(","):
-            json_str = json_str[:-1]
+        json_str = json_str.removesuffix(",")
         
         import json
         data = None

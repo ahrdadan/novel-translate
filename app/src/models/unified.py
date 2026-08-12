@@ -1,6 +1,7 @@
 """Unified translate request schemas for the all-in-one endpoint (POST /api/v1/translate-novel)."""
 
 from pydantic import BaseModel, Field
+
 from src.models.system_prompt import SystemPromptReference
 
 

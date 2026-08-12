@@ -11,8 +11,8 @@ async def create_job(data: dict) -> dict:
     cursor = await db.execute(
         """INSERT INTO jobs
            (series_id, chapter_number, status, force_translate, force_summary,
-            extract, translation_model_ref, extraction_model_ref, strategy, llm_timeout)
-           VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)""",
+            extract, translation_model_ref, extraction_model_ref, strategy, llm_timeout, max_tokens)
+           VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             data["series_id"],
             data["chapter_number"],
@@ -23,6 +23,7 @@ async def create_job(data: dict) -> dict:
             json.dumps(data.get("extraction_model_ref")) if data.get("extraction_model_ref") else None,
             data.get("strategy", "pipeline"),
             data.get("llm_timeout"),
+            data.get("max_tokens"),
         ),
     )
     await db.commit()
@@ -188,7 +189,15 @@ async def reset_stuck_jobs(timeout_minutes: int = 15) -> list[dict]:
                 # Ensure timezone awareness match
                 if started_dt.tzinfo is None:
                     started_dt = started_dt.replace(tzinfo=UTC)
-                if (now - started_dt).total_seconds() > (timeout_minutes * 60):
+                
+                job_timeout_seconds = job.get("llm_timeout")
+                if job_timeout_seconds:
+                    # Give an extra 5 minutes (300 seconds) buffer over the llm_timeout
+                    timeout_sec = job_timeout_seconds + 300
+                else:
+                    timeout_sec = timeout_minutes * 60
+                
+                if (now - started_dt).total_seconds() > timeout_sec:
                     is_stuck = True
             except ValueError:
                 is_stuck = True

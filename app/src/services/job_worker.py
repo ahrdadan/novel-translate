@@ -250,9 +250,13 @@ async def execute_job(job: dict) -> None:
         trans_platform = await platform_repo.get_platform_by_id(trans_model["platform_id"])
 
         llm_timeout = job.get("llm_timeout")
-        if llm_timeout is None:
+        max_tokens = job.get("max_tokens")
+        if llm_timeout is None or max_tokens is None:
             settings = await settings_repo.get_settings()
-            llm_timeout = settings.get("default_llm_timeout", 600)
+            if llm_timeout is None:
+                llm_timeout = settings.get("default_llm_timeout") or 600
+            if max_tokens is None:
+                max_tokens = settings.get("default_max_tokens") or 64000
 
         if job.get("strategy") == "single_pass":
             await ws_manager.broadcast({
@@ -283,6 +287,7 @@ async def execute_job(job: dict) -> None:
                 system_prompt_ref=job.get("system_prompt_ref"),
                 stream_callback=_stream_cb,
                 llm_timeout=llm_timeout,
+                max_tokens=max_tokens,
             )
             translated_text = res["translated_text"]
             chapter_summary = res["chapter_summary"]
@@ -326,6 +331,7 @@ async def execute_job(job: dict) -> None:
                 system_prompt_ref=job.get("system_prompt_ref"),
                 progress_callback=_on_trans_progress,
                 llm_timeout=llm_timeout,
+                max_tokens=max_tokens,
             )
 
             await ws_manager.broadcast({

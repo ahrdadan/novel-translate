@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from src.database import close_db, init_db
 from src.routers.chapters import router as chapters_router
 from src.routers.characters import router as characters_router

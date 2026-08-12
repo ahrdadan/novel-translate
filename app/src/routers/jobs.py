@@ -1,6 +1,7 @@
 """Jobs router — GET /jobs/{id}, GET /jobs (PRD §6.7)."""
 
 from fastapi import APIRouter, HTTPException
+
 from src.database import get_db
 from src.models.job import JobResponse
 from src.repositories import chapter_repo, job_repo

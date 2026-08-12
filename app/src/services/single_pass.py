@@ -52,7 +52,8 @@ async def translate_chapter_single_pass(
     platform: dict,
     system_prompt_ref: dict | None = None,
     stream_callback: Callable[[str], Awaitable[None]] | None = None,
-    llm_timeout: int = 600,
+    llm_timeout: int = 40000,
+    max_tokens: int = 64000,
 ) -> dict:
     """Execute translation, summarization, and extraction in a single LLM call.
 
@@ -100,6 +101,7 @@ async def translate_chapter_single_pass(
             base_url=base_url,
             api_key=api_key,
             timeout=llm_timeout,
+            max_tokens=max_tokens,
         ):
             chunks.append(chunk)
             await stream_callback(chunk)
@@ -112,6 +114,7 @@ async def translate_chapter_single_pass(
             base_url=base_url,
             api_key=api_key,
             timeout=llm_timeout,
+            max_tokens=max_tokens,
         )
 
     # 5. Parse JSON output with robust regex extraction & fuzzy anti-typo parsing
