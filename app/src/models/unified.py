@@ -51,6 +51,7 @@ class UnifiedTranslateRequest(BaseModel):
     extraction_model: ModelReferenceInput | int | str | dict | list | None = Field(None, alias="extractionModel")
     system_prompt: SystemPromptReference | int | str | dict | list | None = Field(None, alias="systemPrompt")
     llm_timeout: int | None = Field(None, alias="llmTimeout")
+    max_tokens: int | None = Field(None, alias="maxTokens")
 
     model_config = {"populate_by_name": True}
 
